@@ -38,9 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
     }
 }
 
-// Fetch Comments
 $c_query = "
-    SELECT c.comment_text, c.created_at, u.username 
+    SELECT c.comment_text, c.created_at, u.username, u.profile_pic 
     FROM comments c
     JOIN users u ON c.user_id = u.id
     WHERE c.article_id = ?
@@ -126,22 +125,26 @@ require_once 'includes/header.php';
                 <?php endif; ?>
 
                 <?php if ($comments->num_rows > 0): ?>
-                    <?php while ($comm = $comments->fetch_assoc()): ?>
-                        <div class="border-bottom pb-3 mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold text-dark"><?= htmlspecialchars($comm['username']) ?></span>
-                                <small class="text-muted"><?= date('M d, Y', strtotime($comm['created_at'])) ?></small>
-                            </div>
-                            <p class="mb-0 text-secondary"><?= nl2br(htmlspecialchars($comm['comment_text'])) ?></p>
-                        </div>
-                    <?php endwhile; ?>
-                <?php else: ?>
-                    <p class="text-muted small mb-0">No comments yet.</p>
-                <?php endif; ?>
+    <?php while ($comm = $comments->fetch_assoc()): ?>
+        <?php 
+            $comm_pic = (!empty($comm['profile_pic']) && $comm['profile_pic'] !== 'default_avatar.png' && file_exists('uploads/profiles/' . $comm['profile_pic']))
+                        ? 'uploads/profiles/' . htmlspecialchars($comm['profile_pic'])
+                        : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+        ?>
+        <div class="d-flex border-bottom pb-3 mb-3">
+            <img src="<?= $comm_pic ?>" class="rounded-circle me-3 border" style="width: 42px; height: 42px; object-fit: cover;" alt="Avatar">
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold text-dark"><?= htmlspecialchars($comm['username']) ?></span>
+                    <small class="text-muted"><?= date('M d, Y', strtotime($comm['created_at'])) ?></small>
+                </div>
+                <p class="mb-0 text-secondary"><?= nl2br(htmlspecialchars($comm['comment_text'])) ?></p>
             </div>
         </div>
-    </div>
-</div>
+    <?php endwhile; ?>
+<?php else: ?>
+    <p class="text-muted small mb-0">No comments yet.</p>
+<?php endif; ?>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
