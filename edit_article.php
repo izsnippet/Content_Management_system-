@@ -38,33 +38,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rev_stmt->execute();
         $rev_stmt->close();
 
-        // 2. Handle image replacement if uploaded
-        $image_name = $article['featured_image'];
-        if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
-            $allowed_exts = ['jpg', 'jpeg', 'png', 'webp'];
-            $file_tmp     = $_FILES['featured_image']['tmp_name'];
-            $file_name    = $_FILES['featured_image']['name'];
-            $ext          = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+      // Retain existing image by default
+        $image_data = $article['featured_image'];
 
-            if (in_array($ext, $allowed_exts) && $_FILES['featured_image']['size'] <= 3 * 1024 * 1024) {
-                $image_name = uniqid('img_', true) . '.' . $ext;
-                move_uploaded_file($file_tmp, 'uploads/images/' . $image_name);
+        // If a new image was chosen, convert to Base64 Data URI
+        if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
+            $allowed_exts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+            $file_tmp     = $_FILES['featured_image']['tmp_name'];
+            $file_size    = $_FILES['featured_image']['size'];
+            $ext          = strtolower(pathinfo($_FILES['featured_image']['name'], PATHINFO_EXTENSION));
+
+            if (!in_array($ext, $allowed_exts)) {
+                $error = "Only JPG, PNG, WebP, and GIF images are permitted.";
+            } elseif ($file_size > 2 * 1024 * 1024) {
+                $error = "Image size cannot exceed 2 MB.";
+            } else {
+                $raw_binary = file_get_contents($file_tmp);
+                $base64     = base64_encode($raw_binary);
+                $image_data = 'data:image/' . ($ext === 'jpg' ? 'jpeg' : $ext) . ';base64,' . $base64;
             }
         }
 
-        // 3. Update the article ensuring ownership holds
-        $up_stmt = $conn->prepare("UPDATE articles SET category_id = ?, title = ?, content = ?, tags = ?, featured_image = ?, status = ? WHERE id = ? AND user_id = ?");
-        $up_stmt->bind_param("isssssii", $category_id, $new_title, $new_content, $tags, $image_name, $status, $article_id, $user_id);
-        
-        if ($up_stmt->execute()) {
-            header("Location: article.php?id=" . $article_id);
-            exit();
-        } else {
-            $error = "Failed to update article.";
+        if (empty($error)) {
+            $up_stmt = $conn->prepare("UPDATE articles SET category_id = ?, title = ?, content = ?, tags = ?, featured_image = ?, status = ? WHERE id = ? AND user_id = ?");
+            $up_stmt->bind_param("isssssii", $category_id, $new_title, $new_content, $tags, $image_data, $status, $article_id, $user_id);
+            
+            if ($up_stmt->execute()) {
+                header("Location: article.php?id=" . $article_id);
+                exit();
+            } else {
+                $error = "Failed to update article.";
+            }
+            $up_stmt->close();
         }
-        $up_stmt->close();
-    }
-}
 
 $page_title = 'Edit: ' . $article['title'];
 require_once 'includes/header.php';

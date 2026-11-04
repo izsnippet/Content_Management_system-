@@ -15,7 +15,7 @@ if (!$category) {
 }
 
 $query = "
-    SELECT a.id, a.title, a.content, a.created_at, u.username 
+    SELECT a.id, a.user_id, a.title, a.content, a.created_at, u.username 
     FROM articles a
     JOIN users u ON a.user_id = u.id
     WHERE a.category_id = ? AND a.status = 'published'
@@ -62,8 +62,10 @@ require_once 'includes/header.php';
                             <?= htmlspecialchars($category['name']) ?>
                         </span>
                         <span class="meta-dot">·</span>
-                        <i class="bi bi-person-fill" style="font-size:.8rem;"></i>
-                        <?= htmlspecialchars($row['username']) ?>
+                        <a href="author.php?id=<?= $row['user_id'] ?>" class="text-decoration-none text-muted fw-semibold">
+                            <i class="bi bi-person-fill" style="font-size:.8rem;"></i>
+                            <?= htmlspecialchars($row['username']) ?>
+                        </a>
                         <span class="meta-dot">·</span>
                         <i class="bi bi-calendar3" style="font-size:.8rem;"></i>
                         <?= date('M d, Y', strtotime($row['created_at'])) ?>

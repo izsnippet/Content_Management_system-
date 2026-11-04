@@ -21,7 +21,7 @@ if (!$article) {
     die("Article not found or not published.");
 }
 
-// Comment Submission
+// 1. Comment Submission Handler
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
     if (!isset($_SESSION['user_id'])) {
         header("Location: login.php");
@@ -38,8 +38,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
     }
 }
 
+// 2. User Comment Deletion Handler (TASK 2: Author ownership verification)
+if (isset($_GET['del_comment']) && isset($_SESSION['user_id'])) {
+    $del_comment_id = intval($_GET['del_comment']);
+    $del_c_stmt = $conn->prepare("DELETE FROM comments WHERE id = ? AND user_id = ?");
+    $del_c_stmt->bind_param("ii", $del_comment_id, $_SESSION['user_id']);
+    $del_c_stmt->execute();
+    $del_c_stmt->close();
+    header("Location: article.php?id=" . $article_id);
+    exit();
+}
+
+// 3. Article Watchlist / Bookmark Toggle Handler (TASK 4)
+if (isset($_GET['toggle_watchlist']) && isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
+    $chk_wl = $conn->prepare("SELECT id FROM watchlist WHERE user_id = ? AND article_id = ? LIMIT 1");
+    $chk_wl->bind_param("ii", $user_id, $article_id);
+    $chk_wl->execute();
+    $wl_res = $chk_wl->get_result();
+
+    if ($wl_item = $wl_res->fetch_assoc()) {
+        // Remove from watchlist
+        $del_wl = $conn->prepare("DELETE FROM watchlist WHERE id = ?");
+        $del_wl->bind_param("i", $wl_item['id']);
+        $del_wl->execute();
+        $del_wl->close();
+    } else {
+        // Add to watchlist
+        $add_wl = $conn->prepare("INSERT INTO watchlist (user_id, article_id) VALUES (?, ?)");
+        $add_wl->bind_param("ii", $user_id, $article_id);
+        $add_wl->execute();
+        $add_wl->close();
+    }
+    $chk_wl->close();
+    header("Location: article.php?id=" . $article_id);
+    exit();
+}
+
+// 4. Check if current user bookmarked this article
+$is_bookmarked = false;
+if (isset($_SESSION['user_id'])) {
+    $wl_stmt = $conn->prepare("SELECT id FROM watchlist WHERE user_id = ? AND article_id = ? LIMIT 1");
+    $wl_stmt->bind_param("ii", $_SESSION['user_id'], $article_id);
+    $wl_stmt->execute();
+    $is_bookmarked = ($wl_stmt->get_result()->num_rows > 0);
+    $wl_stmt->close();
+}
+
+// 5. Fetch Comments with c.id and c.user_id for ownership checks
 $c_query = "
-    SELECT c.comment_text, c.created_at, u.username, u.profile_pic 
+    SELECT c.id, c.user_id, c.comment_text, c.created_at, u.username, u.profile_pic 
     FROM comments c
     JOIN users u ON c.user_id = u.id
     WHERE c.article_id = ?
@@ -59,19 +107,32 @@ require_once 'includes/header.php';
 
 <div class="wk-container" style="max-width:1300px;padding-top:1.75rem;padding-bottom:3rem;">
 
-    <!-- ── Article Tabs ── -->
-    <div class="wk-article-tabs">
-        <a href="article.php?id=<?= $article_id ?>" class="active">
-            <i class="bi bi-book"></i> Read
-        </a>
-        <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
-            <a href="edit_article.php?id=<?= $article_id ?>">
-                <i class="bi bi-pencil-square"></i> Edit Article
+    <!-- ── Article Tabs & Watchlist Action ── -->
+    <div class="wk-article-tabs d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex gap-1 flex-wrap">
+            <a href="article.php?id=<?= $article_id ?>" class="active">
+                <i class="bi bi-book"></i> Read
             </a>
+            <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
+                <a href="edit_article.php?id=<?= $article_id ?>">
+                    <i class="bi bi-pencil-square"></i> Edit Article
+                </a>
+            <?php endif; ?>
+            <a href="history.php?id=<?= $article_id ?>">
+                <i class="bi bi-clock-history"></i> View History
+            </a>
+        </div>
+
+        <?php if (isset($_SESSION['user_id'])): ?>
+            <div class="mb-2 mb-md-0">
+                <a href="article.php?id=<?= $article_id ?>&toggle_watchlist=1"
+                   class="btn btn-sm <?= $is_bookmarked ? 'btn-outline-warning text-dark border-warning' : 'btn-outline-secondary' ?>"
+                   title="<?= $is_bookmarked ? 'Remove this article from your watchlist' : 'Bookmark this article to your watchlist' ?>">
+                    <i class="bi <?= $is_bookmarked ? 'bi-star-fill text-warning' : 'bi-star' ?> me-1"></i>
+                    <?= $is_bookmarked ? 'Remove from Watchlist' : 'Add to Watchlist' ?>
+                </a>
+            </div>
         <?php endif; ?>
-        <a href="history.php?id=<?= $article_id ?>">
-            <i class="bi bi-clock-history"></i> View History
-        </a>
     </div>
 
     <div class="row g-4">
@@ -89,12 +150,12 @@ require_once 'includes/header.php';
                 <h1><?= htmlspecialchars($article['title']) ?></h1>
             </div>
 
-            <!-- Byline -->
+            <!-- Byline with Author Link (TASK 3) -->
             <div class="wk-article-byline animate-fade-in">
-                <span class="byline-author">
+                <a href="author.php?id=<?= $article['user_id'] ?>" class="byline-author text-decoration-none">
                     <i class="bi bi-person-fill"></i>
-                    <?= htmlspecialchars($article['username']) ?>
-                </span>
+                    <span><?= htmlspecialchars($article['username']) ?></span>
+                </a>
                 <span class="sep">·</span>
                 <span><i class="bi bi-calendar3"></i> Published <?= date('M d, Y', strtotime($article['created_at'])) ?></span>
                 <span class="sep">·</span>
@@ -169,14 +230,29 @@ require_once 'includes/header.php';
                                             : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
                             ?>
                             <div class="wk-comment">
-                                <img src="<?= $comm_pic ?>" class="wk-comment-avatar" alt="<?= htmlspecialchars($comm['username']) ?>">
+                                <a href="author.php?id=<?= $comm['user_id'] ?>">
+                                    <img src="<?= $comm_pic ?>" class="wk-comment-avatar" alt="<?= htmlspecialchars($comm['username']) ?>">
+                                </a>
                                 <div class="wk-comment-body">
                                     <div class="wk-comment-meta">
-                                        <span class="wk-comment-author"><?= htmlspecialchars($comm['username']) ?></span>
-                                        <span class="wk-comment-date">
-                                            <i class="bi bi-clock" style="font-size:.75rem;"></i>
-                                            <?= date('M d, Y · H:i', strtotime($comm['created_at'])) ?>
-                                        </span>
+                                        <a href="author.php?id=<?= $comm['user_id'] ?>" class="wk-comment-author text-decoration-none">
+                                            <?= htmlspecialchars($comm['username']) ?>
+                                        </a>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="wk-comment-date">
+                                                <i class="bi bi-clock" style="font-size:.75rem;"></i>
+                                                <?= date('M d, Y · H:i', strtotime($comm['created_at'])) ?>
+                                            </span>
+                                            <!-- TASK 2: Delete Comment Button if logged in user is author of comment -->
+                                            <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $comm['user_id']): ?>
+                                                <a href="article.php?id=<?= $article_id ?>&del_comment=<?= $comm['id'] ?>"
+                                                   class="btn btn-sm btn-outline-danger border-0 p-0 text-danger lh-1 ms-1"
+                                                   title="Delete your comment"
+                                                   onclick="return confirm('Delete this comment?');">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                     <p class="wk-comment-text"><?= nl2br(htmlspecialchars($comm['comment_text'])) ?></p>
                                 </div>
@@ -200,12 +276,13 @@ require_once 'includes/header.php';
                     <h6><i class="bi bi-info-circle text-accent"></i> Article Info</h6>
                 </div>
                 <div style="padding:1rem 1.25rem;font-size:.85rem;">
+                    <!-- Author Information with link to author.php (TASK 3) -->
                     <div style="margin-bottom:.85rem;">
                         <div style="font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Author</div>
-                        <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:.35rem;">
-                            <i class="bi bi-person-circle" style="color:var(--accent);"></i>
-                            <?= htmlspecialchars($article['username']) ?>
-                        </div>
+                        <a href="author.php?id=<?= $article['user_id'] ?>" class="text-decoration-none text-dark fw-semibold d-flex align-items-center gap-2">
+                            <i class="bi bi-person-circle" style="color:var(--accent);font-size:1.1rem;"></i>
+                            <span><?= htmlspecialchars($article['username']) ?></span>
+                        </a>
                     </div>
                     <div style="margin-bottom:.85rem;">
                         <div style="font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Category</div>
@@ -223,6 +300,13 @@ require_once 'includes/header.php';
                     </div>
                 </div>
                 <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem;">
+                    <?php if (isset($_SESSION['user_id'])): ?>
+                        <a href="article.php?id=<?= $article_id ?>&toggle_watchlist=1"
+                           class="btn btn-sm <?= $is_bookmarked ? 'btn-outline-warning text-dark' : 'btn-outline-secondary' ?> w-100 mb-1">
+                            <i class="bi <?= $is_bookmarked ? 'bi-star-fill text-warning' : 'bi-star' ?> me-1"></i>
+                            <?= $is_bookmarked ? 'Remove from Watchlist' : 'Add to Watchlist' ?>
+                        </a>
+                    <?php endif; ?>
                     <a href="history.php?id=<?= $article_id ?>" class="btn btn-outline-secondary btn-sm w-100">
                         <i class="bi bi-clock-history me-1"></i> View History
                     </a>

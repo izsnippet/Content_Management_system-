@@ -7,6 +7,19 @@ $user_id   = $_SESSION['user_id'];
 $username  = $_SESSION['username'];
 $user_role = $_SESSION['role'] ?? 'author';
 
+// 1. Handle Watchlist Removal from Dashboard (TASK 4)
+if (isset($_GET['remove_watchlist'])) {
+    $rm_id = intval($_GET['remove_watchlist']);
+    $rm_stmt = $conn->prepare("DELETE FROM watchlist WHERE user_id = ? AND article_id = ?");
+    $rm_stmt->bind_param("ii", $user_id, $rm_id);
+    $rm_stmt->execute();
+    $rm_stmt->close();
+    header("Location: dashboard.php?tab=watchlist");
+    exit();
+}
+
+$active_tab = $_GET['tab'] ?? 'my-articles';
+
 // User Profile Information
 $user_stmt = $conn->prepare("SELECT email, bio, profile_pic, role, created_at FROM users WHERE id = ?");
 $user_stmt->bind_param("i", $user_id);
@@ -41,6 +54,24 @@ $rev_stmt->bind_result($total_edits);
 $rev_stmt->fetch();
 $rev_stmt->close();
 
+// Watchlist count & items (TASK 4)
+$wl_query = "
+    SELECT a.id, a.title, a.status, a.created_at, a.updated_at, c.name AS category_name, c.id AS category_id,
+           u.username AS author_name, u.id AS author_id, w.created_at AS bookmarked_at
+    FROM watchlist w
+    JOIN articles a ON w.article_id = a.id
+    JOIN categories c ON a.category_id = c.id
+    JOIN users u ON a.user_id = u.id
+    WHERE w.user_id = ?
+    ORDER BY w.created_at DESC
+";
+$wl_stmt = $conn->prepare($wl_query);
+$wl_stmt->bind_param("i", $user_id);
+$wl_stmt->execute();
+$watchlist_articles = $wl_stmt->get_result();
+$total_watchlist = $watchlist_articles->num_rows;
+$wl_stmt->close();
+
 // Fetch author's articles list
 $query = "
     SELECT a.id, a.title, a.status, a.created_at, a.updated_at, c.name AS category_name 
@@ -56,7 +87,7 @@ $articles = $stmt->get_result();
 
 // Fetch recent comments on user's articles (Activity Feed)
 $comm_query = "
-    SELECT c.comment_text, c.created_at, u.username AS commenter, a.title AS article_title, a.id AS article_id
+    SELECT c.comment_text, c.created_at, u.username AS commenter, u.id AS commenter_id, a.title AS article_title, a.id AS article_id
     FROM comments c
     JOIN articles a ON c.article_id = a.id
     JOIN users u ON c.user_id = u.id
@@ -93,7 +124,7 @@ if ($is_admin) {
 
     // All articles across platform
     $admin_articles = $conn->query("
-        SELECT a.id, a.title, a.status, a.created_at, a.updated_at, u.username, c.name AS category_name
+        SELECT a.id, a.title, a.status, a.created_at, a.updated_at, a.user_id, u.username, c.name AS category_name
         FROM articles a
         JOIN users u ON a.user_id = u.id
         JOIN categories c ON a.category_id = c.id
@@ -145,25 +176,33 @@ require_once 'includes/header.php';
                 </div>
             </div>
             <div class="d-flex gap-2">
+                <a href="author.php?id=<?= $user_id ?>" class="btn btn-outline-light btn-sm" title="View your public author profile">
+                    <i class="bi bi-person me-1"></i> Public Profile
+                </a>
                 <a href="profile.php" class="btn btn-outline-light btn-sm">
-                    <i class="bi bi-person-gear me-1"></i> Edit Profile
+                    <i class="bi bi-person-gear me-1"></i> Settings
                 </a>
                 <a href="create_article.php" class="btn btn-primary btn-sm">
-                    <i class="bi bi-pencil-square me-1"></i> Write New Article
+                    <i class="bi bi-pencil-square me-1"></i> Write Article
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- Navigation Pills / View Switcher (Author vs Admin) -->
+    <!-- Navigation Pills / View Switcher -->
     <ul class="nav nav-pills mb-4" id="dashboardTabs" role="tablist" style="gap:.4rem;">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active fw-semibold" id="my-articles-tab" data-bs-toggle="pill" data-bs-target="#my-articles-pane" type="button" role="tab">
+            <button class="nav-link fw-semibold <?= ($active_tab === 'my-articles') ? 'active' : '' ?>" id="my-articles-tab" data-bs-toggle="pill" data-bs-target="#my-articles-pane" type="button" role="tab">
                 <i class="bi bi-journal-text me-1"></i> My Articles (<?= $articles->num_rows ?>)
             </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link fw-semibold" id="activity-tab" data-bs-toggle="pill" data-bs-target="#activity-pane" type="button" role="tab">
+            <button class="nav-link fw-semibold <?= ($active_tab === 'watchlist') ? 'active' : '' ?>" id="watchlist-tab" data-bs-toggle="pill" data-bs-target="#watchlist-pane" type="button" role="tab">
+                <i class="bi bi-star-fill text-warning me-1"></i> Watchlist (<?= $total_watchlist ?>)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold <?= ($active_tab === 'activity') ? 'active' : '' ?>" id="activity-tab" data-bs-toggle="pill" data-bs-target="#activity-pane" type="button" role="tab">
                 <i class="bi bi-chat-left-dots me-1"></i> Comments Activity
             </button>
         </li>
@@ -197,40 +236,51 @@ require_once 'includes/header.php';
         <!-- ══════════════════════════════════════════
              PANE 1: MY ARTICLES (Author Dashboard)
         ══════════════════════════════════════════ -->
-        <div class="tab-pane fade show active" id="my-articles-pane" role="tabpanel">
+        <div class="tab-pane fade <?= ($active_tab === 'my-articles') ? 'show active' : '' ?>" id="my-articles-pane" role="tabpanel">
 
-            <!-- Author Metrics -->
+            <!-- Author Metrics (4-Column) -->
             <div class="row g-3 mb-4">
-                <div class="col-sm-4">
+                <div class="col-sm-6 col-lg-3">
                     <div class="wk-stat-card reveal">
                         <div class="wk-stat-icon success">
                             <i class="bi bi-check-circle-fill"></i>
                         </div>
                         <div>
-                            <div class="wk-stat-label">Published Articles</div>
+                            <div class="wk-stat-label">Published</div>
                             <div class="wk-stat-value" data-target="<?= $total_published ?>"><?= $total_published ?></div>
                         </div>
                     </div>
                 </div>
-                <div class="col-sm-4">
+                <div class="col-sm-6 col-lg-3">
                     <div class="wk-stat-card reveal">
                         <div class="wk-stat-icon warning">
                             <i class="bi bi-file-earmark-text-fill"></i>
                         </div>
                         <div>
-                            <div class="wk-stat-label">Drafts Saved</div>
+                            <div class="wk-stat-label">Drafts</div>
                             <div class="wk-stat-value" data-target="<?= $total_drafts ?>"><?= $total_drafts ?></div>
                         </div>
                     </div>
                 </div>
-                <div class="col-sm-4">
+                <div class="col-sm-6 col-lg-3">
                     <div class="wk-stat-card reveal">
                         <div class="wk-stat-icon info">
                             <i class="bi bi-clock-history"></i>
                         </div>
                         <div>
-                            <div class="wk-stat-label">Revisions Contributed</div>
+                            <div class="wk-stat-label">Revisions</div>
                             <div class="wk-stat-value" data-target="<?= $total_edits ?>"><?= $total_edits ?></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-3">
+                    <div class="wk-stat-card reveal">
+                        <div class="wk-stat-icon" style="background:#fef3c7;color:#d97706;">
+                            <i class="bi bi-star-fill"></i>
+                        </div>
+                        <div>
+                            <div class="wk-stat-label">Watchlist</div>
+                            <div class="wk-stat-value" data-target="<?= $total_watchlist ?>"><?= $total_watchlist ?></div>
                         </div>
                     </div>
                 </div>
@@ -338,9 +388,99 @@ require_once 'includes/header.php';
         </div><!-- /#my-articles-pane -->
 
         <!-- ══════════════════════════════════════════
-             PANE 2: COMMENTS ACTIVITY
+             PANE 2: MY WATCHLIST / BOOKMARKS (TASK 4)
         ══════════════════════════════════════════ -->
-        <div class="tab-pane fade" id="activity-pane" role="tabpanel">
+        <div class="tab-pane fade <?= ($active_tab === 'watchlist') ? 'show active' : '' ?>" id="watchlist-pane" role="tabpanel">
+            <div class="wk-dash-table-wrap">
+                <div class="wk-dash-table-header flex-wrap">
+                    <div class="d-flex align-items-center gap-2">
+                        <h5><i class="bi bi-star-fill text-warning me-2"></i>My Saved Watchlist</h5>
+                        <span class="badge bg-light text-dark border"><?= $total_watchlist ?> saved</span>
+                    </div>
+                    <div style="position:relative;width:240px;">
+                        <i class="bi bi-search" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.8rem;pointer-events:none;"></i>
+                        <input type="text" id="watchlistSearch" class="form-control form-control-sm"
+                               style="padding-left:2.1rem;font-size:.82rem;"
+                               placeholder="Filter saved articles…">
+                    </div>
+                </div>
+
+                <?php if ($total_watchlist > 0): ?>
+                    <div class="table-responsive">
+                        <table class="wk-table" id="watchlistTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:40%;">Article Title</th>
+                                    <th>Category</th>
+                                    <th>Author</th>
+                                    <th>Status</th>
+                                    <th>Saved On</th>
+                                    <th class="text-end" style="padding-right:1.4rem;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php while ($w_art = $watchlist_articles->fetch_assoc()): ?>
+                                    <tr>
+                                        <td>
+                                            <a href="article.php?id=<?= $w_art['id'] ?>" class="fw-semibold text-dark text-decoration-none watchlist-item-title">
+                                                <i class="bi bi-file-earmark-text text-accent me-1"></i>
+                                                <?= htmlspecialchars($w_art['title']) ?>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <a href="category.php?id=<?= $w_art['category_id'] ?>" class="badge badge-category text-decoration-none">
+                                                <?= htmlspecialchars($w_art['category_name']) ?>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <a href="author.php?id=<?= $w_art['author_id'] ?>" class="text-decoration-none text-muted small fw-semibold">
+                                                <i class="bi bi-person me-1"></i><?= htmlspecialchars($w_art['author_name']) ?>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <?php if ($w_art['status'] === 'published'): ?>
+                                                <span class="status-pill published"><i class="bi bi-check-circle-fill"></i> Published</span>
+                                            <?php else: ?>
+                                                <span class="status-pill draft"><i class="bi bi-pencil-fill"></i> <?= htmlspecialchars(ucfirst($w_art['status'])) ?></span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td style="color:var(--muted);font-size:.82rem;white-space:nowrap;">
+                                            <i class="bi bi-calendar3" style="font-size:.78rem;"></i>
+                                            <?= date('M d, Y', strtotime($w_art['bookmarked_at'])) ?>
+                                        </td>
+                                        <td class="text-end" style="padding-right:1.4rem;">
+                                            <a href="article.php?id=<?= $w_art['id'] ?>" class="btn btn-sm btn-outline-primary me-1" title="Read Article">
+                                                <i class="bi bi-eye"></i> Read
+                                            </a>
+                                            <a href="dashboard.php?remove_watchlist=<?= $w_art['id'] ?>"
+                                               class="btn btn-sm btn-outline-danger"
+                                               title="Remove from Watchlist"
+                                               onclick="return confirm('Remove this article from your watchlist?');">
+                                                <i class="bi bi-star"></i> Remove
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="wk-empty py-5">
+                        <i class="bi bi-star text-warning" style="opacity:.6;"></i>
+                        <h5>Your Watchlist is empty</h5>
+                        <p class="text-muted small">You can bookmark any article by clicking the <strong>Add to Watchlist</strong> button while reading it.</p>
+                        <a href="index.php" class="btn btn-outline-primary btn-sm mt-2">
+                            <i class="bi bi-compass me-1"></i> Browse Knowledge Base
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             PANE 3: COMMENTS ACTIVITY
+        ══════════════════════════════════════════ -->
+        <div class="tab-pane fade <?= ($active_tab === 'activity') ? 'show active' : '' ?>" id="activity-pane" role="tabpanel">
             <div class="wk-card wk-card-static">
                 <div class="wk-dash-table-header">
                     <h5><i class="bi bi-chat-left-text text-accent me-2"></i> Recent Comments on Your Articles</h5>
@@ -352,7 +492,9 @@ require_once 'includes/header.php';
                                 <div class="list-group-item d-flex justify-content-between align-items-start py-3 px-0 border-bottom">
                                     <div class="me-3">
                                         <div class="d-flex align-items-center gap-2 mb-1">
-                                            <span class="fw-bold text-dark"><?= htmlspecialchars($comm['commenter']) ?></span>
+                                            <a href="author.php?id=<?= $comm['commenter_id'] ?>" class="fw-bold text-dark text-decoration-none">
+                                                <?= htmlspecialchars($comm['commenter']) ?>
+                                            </a>
                                             <span class="text-muted small">&bull;</span>
                                             <span class="text-muted small"><?= date('M d, Y · H:i', strtotime($comm['created_at'])) ?></span>
                                         </div>
@@ -383,7 +525,7 @@ require_once 'includes/header.php';
 
         <?php if ($is_admin): ?>
             <!-- ══════════════════════════════════════════
-                 ADMIN PANE 3: PLATFORM OVERVIEW
+                 ADMIN PANE 4: PLATFORM OVERVIEW
             ══════════════════════════════════════════ -->
             <div class="tab-pane fade" id="admin-overview-pane" role="tabpanel">
                 <div class="row g-3 mb-4">
@@ -461,7 +603,7 @@ require_once 'includes/header.php';
             </div>
 
             <!-- ══════════════════════════════════════════
-                 ADMIN PANE 4: ALL ARTICLES MANAGEMENT
+                 ADMIN PANE 5: ALL ARTICLES MANAGEMENT
             ══════════════════════════════════════════ -->
             <div class="tab-pane fade" id="admin-articles-pane" role="tabpanel">
                 <div class="wk-dash-table-wrap">
@@ -493,7 +635,9 @@ require_once 'includes/header.php';
                                                 </a>
                                             </td>
                                             <td>
-                                                <i class="bi bi-person me-1 text-muted"></i><?= htmlspecialchars($a['username']) ?>
+                                                <a href="author.php?id=<?= $a['user_id'] ?>" class="text-decoration-none text-muted small">
+                                                    <i class="bi bi-person me-1"></i><?= htmlspecialchars($a['username']) ?>
+                                                </a>
                                             </td>
                                             <td>
                                                 <span class="badge badge-category"><?= htmlspecialchars($a['category_name']) ?></span>
@@ -525,7 +669,7 @@ require_once 'includes/header.php';
             </div>
 
             <!-- ══════════════════════════════════════════
-                 ADMIN PANE 5: USERS MANAGEMENT
+                 ADMIN PANE 6: USERS MANAGEMENT
             ══════════════════════════════════════════ -->
             <div class="tab-pane fade" id="admin-users-pane" role="tabpanel">
                 <div class="wk-dash-table-wrap">
@@ -543,6 +687,7 @@ require_once 'includes/header.php';
                                     <th>Role</th>
                                     <th>Articles Written</th>
                                     <th>Registered Date</th>
+                                    <th class="text-end" style="padding-right:1.4rem;">Profile</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -564,6 +709,11 @@ require_once 'includes/header.php';
                                             <td style="color:var(--muted);font-size:.82rem;">
                                                 <?= date('M d, Y', strtotime($u['created_at'])) ?>
                                             </td>
+                                            <td class="text-end" style="padding-right:1.4rem;">
+                                                <a href="author.php?id=<?= $u['id'] ?>" class="btn btn-sm btn-outline-secondary">
+                                                    Author Profile &rarr;
+                                                </a>
+                                            </td>
                                         </tr>
                                     <?php endwhile; ?>
                                 <?php endif; ?>
@@ -574,7 +724,7 @@ require_once 'includes/header.php';
             </div>
 
             <!-- ══════════════════════════════════════════
-                 ADMIN PANE 6: CATEGORIES MANAGEMENT
+                 ADMIN PANE 7: CATEGORIES MANAGEMENT
             ══════════════════════════════════════════ -->
             <div class="tab-pane fade" id="admin-categories-pane" role="tabpanel">
                 <div class="wk-dash-table-wrap">
@@ -641,7 +791,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // 2. Author quick status filters
+    // 2. Watchlist live search
+    const wlSearch = document.getElementById("watchlistSearch");
+    const wlTable = document.getElementById("watchlistTable");
+    if (wlSearch && wlTable) {
+        wlSearch.addEventListener("input", function () {
+            const query = this.value.toLowerCase().trim();
+            wlTable.querySelectorAll("tbody tr").forEach(function (row) {
+                const title = row.querySelector(".watchlist-item-title")?.textContent.toLowerCase() || "";
+                row.style.display = title.includes(query) ? "" : "none";
+            });
+        });
+    }
+
+    // 3. Author quick status filters
     const filterAll = document.getElementById("filterAll");
     const filterPublished = document.getElementById("filterPublished");
     const filterDraft = document.getElementById("filterDraft");
@@ -664,7 +827,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (filterPublished) filterPublished.addEventListener("click", () => applyStatusFilter("published", filterPublished));
     if (filterDraft) filterDraft.addEventListener("click", () => applyStatusFilter("draft", filterDraft));
 
-    // 3. Admin table live searches
+    // 4. Admin table live searches
     function setupTableSearch(inputId, tableId) {
         const inp = document.getElementById(inputId);
         const tbl = document.getElementById(tableId);
