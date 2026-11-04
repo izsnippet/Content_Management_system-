@@ -91,71 +91,97 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     }
 }
 
+$has_custom_pic = (!empty($user['profile_pic']) && $user['profile_pic'] !== 'default_avatar.png' && file_exists('uploads/profiles/' . $user['profile_pic']));
+$avatar_path = $has_custom_pic ? 'uploads/profiles/' . htmlspecialchars($user['profile_pic']) : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+
+$page_title = 'My Profile';
 require_once 'includes/header.php';
 ?>
 
-<div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="card shadow-sm border-0 my-3">
-            <div class="card-header bg-white py-3">
-                <h4 class="fw-bold mb-0">My Profile</h4>
-            </div>
-            <div class="card-body p-4">
-                <?php if (!empty($message)): ?>
-                    <div class="alert alert-success py-2 small"><?= htmlspecialchars($message) ?></div>
-                <?php endif; ?>
-                <?php if (!empty($error)): ?>
-                    <div class="alert alert-danger py-2 small"><?= htmlspecialchars($error) ?></div>
-                <?php endif; ?>
+<div class="wk-container" style="max-width:1300px;padding-top:1.75rem;padding-bottom:3rem;">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 col-xl-6">
 
-                <!-- Avatar Display & Remove Button -->
-                <div class="text-center mb-4">
-                    <?php 
-                        $has_custom_pic = (!empty($user['profile_pic']) && $user['profile_pic'] !== 'default_avatar.png' && file_exists('uploads/profiles/' . $user['profile_pic']));
-                        $avatar_path = $has_custom_pic ? 'uploads/profiles/' . htmlspecialchars($user['profile_pic']) : 'https://cdn-icons-png.flflaticon.com/512/149/149071.png';
-                    ?>
-                    <img src="<?= $avatar_path ?>" alt="Avatar" class="rounded-circle shadow-sm mb-3 border" style="width: 120px; height: 120px; object-fit: cover;">
-                    
-                    <?php if ($has_custom_pic): ?>
-                        <form action="profile.php" method="POST" onsubmit="return confirm('Are you sure you want to remove your profile picture?');">
-                            <button type="submit" name="remove_pic" class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i> Remove Picture
-                            </button>
-                        </form>
-                    <?php endif; ?>
+            <!-- Profile Header Card -->
+            <div class="wk-card wk-card-static mb-4 animate-fade-in" style="text-align:center;padding:2rem;">
+                <img src="<?= $avatar_path ?>" alt="Profile picture of <?= htmlspecialchars($user['username']) ?>"
+                     class="wk-profile-avatar">
+                <h4 style="font-weight:800;letter-spacing:-.02em;margin-bottom:.3rem;"><?= htmlspecialchars($user['username']) ?></h4>
+                <span class="wk-profile-role">
+                    <i class="bi bi-shield-check" style="font-size:.75rem;"></i>
+                    <?= htmlspecialchars(ucfirst($user['role'] ?? 'author')) ?>
+                </span>
+                <div class="wk-profile-since mt-2 justify-content-center">
+                    <i class="bi bi-calendar3"></i>
+                    Member since <?= date('F Y', strtotime($user['created_at'])) ?>
                 </div>
 
-                <form action="profile.php" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label class="form-label text-muted small fw-semibold">Username</label>
-                        <input type="text" class="form-control" value="<?= htmlspecialchars($user['username']) ?>" disabled>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label text-muted small fw-semibold">Email Address</label>
-                        <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" disabled>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="profile_pic" class="form-label fw-semibold">Change Profile Picture</label>
-                        <input type="file" name="profile_pic" id="profile_pic" class="form-control" accept="image/jpeg,image/png,image/webp">
-                        <small class="text-muted">Accepted formats: JPG, PNG, WebP (Max 2 MB).</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="bio" class="form-label fw-semibold">Biography</label>
-                        <textarea name="bio" id="bio" rows="4" class="form-control" placeholder="Write a short bio about yourself..."><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center mt-4">
-                        <span class="text-muted small">Member since: <?= date('M d, Y', strtotime($user['created_at'])) ?></span>
-                        <button type="submit" name="update_profile" class="btn btn-primary">Save Changes</button>
-                    </div>
-                </form>
+                <?php if ($has_custom_pic): ?>
+                    <form action="profile.php" method="POST" style="margin-top:.85rem;"
+                          onsubmit="return confirm('Remove your profile picture?');">
+                        <button type="submit" name="remove_pic" class="btn btn-sm btn-outline-danger" style="font-size:.8rem;">
+                            <i class="bi bi-trash me-1"></i> Remove Picture
+                        </button>
+                    </form>
+                <?php endif; ?>
             </div>
+
+            <!-- Edit Profile Card -->
+            <div class="wk-card wk-card-static animate-slide-up">
+                <div style="padding:1.1rem 1.5rem;border-bottom:1px solid var(--border);background:var(--surface-alt);">
+                    <h5 style="margin:0;font-size:.95rem;font-weight:700;display:flex;align-items:center;gap:.4rem;">
+                        <i class="bi bi-person-gear text-accent"></i> Edit Profile
+                    </h5>
+                </div>
+                <div style="padding:1.75rem;">
+
+                    <?php if (!empty($message)): ?>
+                        <div class="alert alert-success"><i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($message) ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($error)): ?>
+                        <div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i><?= htmlspecialchars($error) ?></div>
+                    <?php endif; ?>
+
+                    <form action="profile.php" method="POST" enctype="multipart/form-data">
+
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" value="<?= htmlspecialchars($user['username']) ?>" disabled>
+                            <div class="form-text">Username cannot be changed.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Email Address</label>
+                            <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>" disabled>
+                            <div class="form-text">Email cannot be changed from this page.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="profile_pic" class="form-label">Change Profile Picture</label>
+                            <input type="file" name="profile_pic" id="profile_pic" class="form-control"
+                                   accept="image/jpeg,image/png,image/webp">
+                            <div class="form-text">Accepted formats: JPG, PNG, WebP — Max 2 MB.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="bio" class="form-label">Biography</label>
+                            <textarea name="bio" id="bio" rows="4" class="form-control"
+                                      placeholder="Write a short bio about yourself, your interests, or expertise…"><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
+                            <div class="form-text">This will appear on your public profile.</div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" name="update_profile" class="btn btn-primary">
+                                <i class="bi bi-check2 me-1"></i> Save Changes
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
 <?php require_once 'includes/footer.php'; ?>
-

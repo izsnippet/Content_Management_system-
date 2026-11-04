@@ -48,52 +48,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$page_title = 'Create Account';
 require_once 'includes/header.php';
 ?>
 
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-        <div class="card shadow-sm border-0 mt-3">
-            <div class="card-body p-4">
-                <h3 class="card-title text-center fw-bold mb-4">Create an Account</h3>
+<div class="wk-container" style="max-width:500px;padding-top:2.5rem;padding-bottom:3.5rem;">
+    <div class="wk-auth-card animate-slide-up mx-auto">
 
-                <?php if (!empty($error)): ?>
-                    <div class="alert alert-danger py-2"><?= htmlspecialchars($error) ?></div>
-                <?php endif; ?>
+        <!-- Logo / Icon -->
+        <div class="text-center mb-4">
+            <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--accent) 0%,#6366f1 100%);border-radius:12px;display:grid;place-items:center;color:#fff;font-size:1.35rem;margin:0 auto .85rem;">
+                <i class="bi bi-stars"></i>
+            </div>
+            <h3 class="fw-bold mb-1" style="font-family:var(--font-heading);letter-spacing:-.03em;">Create Your Account</h3>
+            <p class="text-muted small">Join the community of knowledge contributors</p>
+        </div>
 
-                <?php if (!empty($success)): ?>
-                    <div class="alert alert-success py-2"><?= $success ?></div>
-                <?php endif; ?>
+        <!-- Messages -->
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-circle me-2"></i><?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($success)): ?>
+            <div class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle me-2"></i><?= $success ?>
+            </div>
+        <?php endif; ?>
 
-                <form action="register.php" method="POST" autocomplete="off">
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" name="username" id="username" class="form-control" value="<?= htmlspecialchars($username ?? '') ?>" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email Address</label>
-                        <input type="email" name="email" id="email" class="form-control" value="<?= htmlspecialchars($email ?? '') ?>" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" name="password" id="password" class="form-control" required minlength="6">
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="confirm_password" class="form-label">Confirm Password</label>
-                        <input type="password" name="confirm_password" id="confirm_password" class="form-control" required minlength="6">
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">Sign Up</button>
-                </form>
-
-                <div class="text-center mt-3">
-                    <small class="text-muted">Already have an account? <a href="login.php" class="text-decoration-none">Log in</a></small>
+        <!-- Form -->
+        <form action="register.php" method="POST" autocomplete="off">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <div style="position:relative;">
+                    <i class="bi bi-at" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.95rem;pointer-events:none;"></i>
+                    <input type="text" name="username" id="username" class="form-control"
+                           style="padding-left:2.5rem;"
+                           value="<?= htmlspecialchars($username ?? '') ?>"
+                           placeholder="Choose a username"
+                           required>
                 </div>
             </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email Address</label>
+                <div style="position:relative;">
+                    <i class="bi bi-envelope" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.95rem;pointer-events:none;"></i>
+                    <input type="email" name="email" id="email" class="form-control"
+                           style="padding-left:2.5rem;"
+                           value="<?= htmlspecialchars($email ?? '') ?>"
+                           placeholder="name@example.com"
+                           required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <div style="position:relative;">
+                    <i class="bi bi-lock" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.95rem;pointer-events:none;"></i>
+                    <input type="password" name="password" id="password" class="form-control"
+                           style="padding-left:2.5rem;"
+                           placeholder="At least 6 characters"
+                           required minlength="6">
+                </div>
+                <div class="form-text">Must be at least 6 characters.</div>
+            </div>
+
+            <div class="mb-4">
+                <label for="confirm_password" class="form-label">Confirm Password</label>
+                <div style="position:relative;">
+                    <i class="bi bi-shield-lock" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.95rem;pointer-events:none;"></i>
+                    <input type="password" name="confirm_password" id="confirm_password" class="form-control"
+                           style="padding-left:2.5rem;"
+                           placeholder="Repeat your password"
+                           required minlength="6">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2" style="font-size:.95rem;">
+                <i class="bi bi-person-plus me-1"></i> Register Free
+            </button>
+        </form>
+
+        <div class="wk-auth-footer mt-4 pt-3 border-top">
+            Already have an account? <a href="login.php">Sign in &rarr;</a>
         </div>
+
     </div>
 </div>
 

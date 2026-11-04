@@ -53,98 +53,189 @@ $comments = $c_stmt->get_result();
 // Wikipedia [[Keyword]] auto-linker
 $rendered_content = preg_replace('/\[\[(.*?)\]\]/', '<a href="search.php?q=$1" class="text-primary text-decoration-underline">$1</a>', $article['content']);
 
+$page_title = $article['title'];
 require_once 'includes/header.php';
 ?>
 
-<!-- Wikipedia Top Navigation Tabs -->
-<!-- Top Navigation Tabs (Social Media Style: Only Author can Edit) -->
-<ul class="nav nav-tabs mb-4">
-    <li class="nav-item">
-        <a class="nav-link active fw-bold" href="article.php?id=<?= $article_id ?>"><i class="bi bi-book"></i> Read</a>
-    </li>
-    
-    <!-- Render Edit tab ONLY if the viewer is the author who wrote it -->
-    <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
-        <li class="nav-item">
-            <a class="nav-link text-primary fw-semibold" href="edit_article.php?id=<?= $article_id ?>"><i class="bi bi-pencil-square"></i> Edit My Article</a>
-        </li>
-    <?php endif; ?>
+<div class="wk-container" style="max-width:1300px;padding-top:1.75rem;padding-bottom:3rem;">
 
-    <li class="nav-item">
-        <a class="nav-link" href="history.php?id=<?= $article_id ?>"><i class="bi bi-clock-history"></i> View History</a>
-    </li>
-</ul>
-
-<div class="row">
-    <div class="col-lg-9">
-        <h1 class="display-5 fw-bold"><?= htmlspecialchars($article['title']) ?></h1>
-        <div class="text-muted small pb-3 mb-4 border-bottom">
-            Authored by <strong><?= htmlspecialchars($article['username']) ?></strong> &bull;
-            Category: <a href="category.php?id=<?= $article['category_id'] ?>" class="badge bg-secondary text-decoration-none"><?= htmlspecialchars($article['category_name']) ?></a> &bull;
-            Last revised: <?= date('M d, Y - H:i', strtotime($article['updated_at'])) ?>
-        </div>
-
-        <?php if (!empty($article['featured_image'])): ?>
-            <img src="uploads/images/<?= htmlspecialchars($article['featured_image']) ?>" class="img-fluid rounded mb-4" alt="Featured Image">
+    <!-- ── Article Tabs ── -->
+    <div class="wk-article-tabs">
+        <a href="article.php?id=<?= $article_id ?>" class="active">
+            <i class="bi bi-book"></i> Read
+        </a>
+        <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
+            <a href="edit_article.php?id=<?= $article_id ?>">
+                <i class="bi bi-pencil-square"></i> Edit Article
+            </a>
         <?php endif; ?>
+        <a href="history.php?id=<?= $article_id ?>">
+            <i class="bi bi-clock-history"></i> View History
+        </a>
+    </div>
 
-        <!-- Wikipedia Auto-Generated Table of Contents -->
-        <div id="wiki-toc" class="p-3 bg-light border rounded mb-4 d-none" style="max-width: 380px;">
-            <div class="fw-bold mb-2 border-bottom pb-1"><i class="bi bi-list-nested"></i> Contents</div>
-            <ul id="toc-list" class="list-unstyled mb-0 small ps-2"></ul>
-        </div>
+    <div class="row g-4">
+        <!-- ── Main Content ── -->
+        <div class="col-lg-9">
 
-        <div class="article-body fs-5 lh-lg mb-5">
-            <?= $rendered_content ?>
-        </div>
-
-        <?php if (!empty($article['tags'])): ?>
-            <div class="mb-5">
-                <span class="fw-bold me-2"><i class="bi bi-tags"></i> Tags:</span>
-                <?php foreach (explode(',', $article['tags']) as $tag): ?>
-                    <a href="search.php?q=<?= urlencode(trim($tag)) ?>" class="badge bg-light text-dark border text-decoration-none me-1"><?= htmlspecialchars(trim($tag)) ?></a>
-                <?php endforeach; ?>
+            <!-- Article Header -->
+            <div class="wk-article-header animate-fade-in">
+                <span class="badge badge-category mb-3" style="font-size:.8rem;padding:.35em .9em;">
+                    <i class="bi bi-grid-3x3-gap-fill" style="font-size:.7rem;"></i>
+                    <a href="category.php?id=<?= $article['category_id'] ?>" style="color:inherit;text-decoration:none;">
+                        <?= htmlspecialchars($article['category_name']) ?>
+                    </a>
+                </span>
+                <h1><?= htmlspecialchars($article['title']) ?></h1>
             </div>
-        <?php endif; ?>
 
-        <!-- Comments -->
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white py-3 fw-bold">Discussion & Comments (<?= $comments->num_rows ?>)</div>
-            <div class="card-body">
+            <!-- Byline -->
+            <div class="wk-article-byline animate-fade-in">
+                <span class="byline-author">
+                    <i class="bi bi-person-fill"></i>
+                    <?= htmlspecialchars($article['username']) ?>
+                </span>
+                <span class="sep">·</span>
+                <span><i class="bi bi-calendar3"></i> Published <?= date('M d, Y', strtotime($article['created_at'])) ?></span>
+                <span class="sep">·</span>
+                <span><i class="bi bi-pencil"></i> Last revised <?= date('M d, Y', strtotime($article['updated_at'])) ?></span>
+            </div>
+
+            <!-- Featured Image -->
+            <?php if (!empty($article['featured_image'])): ?>
+                <img src="uploads/images/<?= htmlspecialchars($article['featured_image']) ?>"
+                     class="wk-featured-img animate-fade-in"
+                     alt="Featured image for <?= htmlspecialchars($article['title']) ?>">
+            <?php endif; ?>
+
+            <!-- Table of Contents -->
+            <div id="wiki-toc" class="d-none animate-fade-in">
+                <div class="toc-heading">
+                    <i class="bi bi-list-nested"></i> Contents
+                </div>
+                <ul id="toc-list"></ul>
+            </div>
+
+            <!-- Article Body -->
+            <div class="article-body animate-slide-up">
+                <?= $rendered_content ?>
+            </div>
+
+            <!-- Tags -->
+            <?php if (!empty($article['tags'])): ?>
+                <div class="wk-tags mt-3 mb-5">
+                    <span class="wk-tags-label"><i class="bi bi-tags-fill"></i> Tags:</span>
+                    <?php foreach (explode(',', $article['tags']) as $tag): ?>
+                        <a href="search.php?q=<?= urlencode(trim($tag)) ?>" class="badge badge-tag">
+                            <?= htmlspecialchars(trim($tag)) ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Comments Section -->
+            <div class="wk-comments-card animate-slide-up">
+                <div class="wk-comments-header">
+                    <i class="bi bi-chat-dots-fill text-accent"></i>
+                    <h5>Discussion &amp; Comments</h5>
+                    <span class="wk-comment-count"><?= $comments->num_rows ?></span>
+                </div>
+
                 <?php if (isset($_SESSION['user_id'])): ?>
-                    <form action="article.php?id=<?= $article_id ?>" method="POST" class="mb-4">
-                        <div class="mb-3">
-                            <textarea name="comment_text" class="form-control" rows="3" placeholder="Leave a constructive comment..." required></textarea>
-                        </div>
-                        <button type="submit" name="submit_comment" class="btn btn-primary btn-sm">Post Comment</button>
-                    </form>
+                    <div class="wk-comment-form">
+                        <form action="article.php?id=<?= $article_id ?>" method="POST">
+                            <div class="mb-3">
+                                <textarea name="comment_text" class="form-control" rows="3"
+                                          placeholder="Share your thoughts or contribute to the discussion…" required></textarea>
+                            </div>
+                            <button type="submit" name="submit_comment" class="btn btn-primary btn-sm">
+                                <i class="bi bi-send me-1"></i> Post Comment
+                            </button>
+                        </form>
+                    </div>
                 <?php else: ?>
-                    <div class="alert alert-light border small">
-                        Please <a href="login.php">log in</a> to participate in the discussion.
+                    <div class="wk-comment-login-prompt">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Please <a href="login.php">sign in</a> to participate in the discussion.
                     </div>
                 <?php endif; ?>
 
                 <?php if ($comments->num_rows > 0): ?>
-    <?php while ($comm = $comments->fetch_assoc()): ?>
-        <?php 
-            $comm_pic = (!empty($comm['profile_pic']) && $comm['profile_pic'] !== 'default_avatar.png' && file_exists('uploads/profiles/' . $comm['profile_pic']))
-                        ? 'uploads/profiles/' . htmlspecialchars($comm['profile_pic'])
-                        : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-        ?>
-        <div class="d-flex border-bottom pb-3 mb-3">
-            <img src="<?= $comm_pic ?>" class="rounded-circle me-3 border" style="width: 42px; height: 42px; object-fit: cover;" alt="Avatar">
-            <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-bold text-dark"><?= htmlspecialchars($comm['username']) ?></span>
-                    <small class="text-muted"><?= date('M d, Y', strtotime($comm['created_at'])) ?></small>
-                </div>
-                <p class="mb-0 text-secondary"><?= nl2br(htmlspecialchars($comm['comment_text'])) ?></p>
+                    <div class="wk-comments-list">
+                        <?php while ($comm = $comments->fetch_assoc()): ?>
+                            <?php
+                                $comm_pic = (!empty($comm['profile_pic']) && $comm['profile_pic'] !== 'default_avatar.png' && file_exists('uploads/profiles/' . $comm['profile_pic']))
+                                            ? 'uploads/profiles/' . htmlspecialchars($comm['profile_pic'])
+                                            : 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                            ?>
+                            <div class="wk-comment">
+                                <img src="<?= $comm_pic ?>" class="wk-comment-avatar" alt="<?= htmlspecialchars($comm['username']) ?>">
+                                <div class="wk-comment-body">
+                                    <div class="wk-comment-meta">
+                                        <span class="wk-comment-author"><?= htmlspecialchars($comm['username']) ?></span>
+                                        <span class="wk-comment-date">
+                                            <i class="bi bi-clock" style="font-size:.75rem;"></i>
+                                            <?= date('M d, Y · H:i', strtotime($comm['created_at'])) ?>
+                                        </span>
+                                    </div>
+                                    <p class="wk-comment-text"><?= nl2br(htmlspecialchars($comm['comment_text'])) ?></p>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="wk-no-comments">
+                        <i class="bi bi-chat" style="font-size:1.5rem;opacity:.35;display:block;margin-bottom:.4rem;"></i>
+                        No comments yet. Be the first to start the discussion!
+                    </div>
+                <?php endif; ?>
             </div>
-        </div>
-    <?php endwhile; ?>
-<?php else: ?>
-    <p class="text-muted small mb-0">No comments yet.</p>
-<?php endif; ?>
+
+        </div><!-- /.col-lg-9 -->
+
+        <!-- ── Right Sidebar ── -->
+        <div class="col-lg-3">
+            <div class="wk-sidebar-card mb-3" style="position:sticky;top:calc(var(--nav-h) + 1rem);">
+                <div class="wk-sidebar-header">
+                    <h6><i class="bi bi-info-circle text-accent"></i> Article Info</h6>
+                </div>
+                <div style="padding:1rem 1.25rem;font-size:.85rem;">
+                    <div style="margin-bottom:.85rem;">
+                        <div style="font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Author</div>
+                        <div style="font-weight:600;color:var(--text);display:flex;align-items:center;gap:.35rem;">
+                            <i class="bi bi-person-circle" style="color:var(--accent);"></i>
+                            <?= htmlspecialchars($article['username']) ?>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:.85rem;">
+                        <div style="font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Category</div>
+                        <a href="category.php?id=<?= $article['category_id'] ?>" class="badge badge-category" style="font-size:.8rem;">
+                            <?= htmlspecialchars($article['category_name']) ?>
+                        </a>
+                    </div>
+                    <div style="margin-bottom:.85rem;">
+                        <div style="font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Published</div>
+                        <div style="color:var(--text-secondary);"><?= date('M d, Y', strtotime($article['created_at'])) ?></div>
+                    </div>
+                    <div>
+                        <div style="font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem;">Last Revised</div>
+                        <div style="color:var(--text-secondary);"><?= date('M d, Y', strtotime($article['updated_at'])) ?></div>
+                    </div>
+                </div>
+                <div style="padding:.75rem 1.25rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:.4rem;">
+                    <a href="history.php?id=<?= $article_id ?>" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-clock-history me-1"></i> View History
+                    </a>
+                    <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
+                        <a href="edit_article.php?id=<?= $article_id ?>" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="bi bi-pencil me-1"></i> Edit Article
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div><!-- /.col-lg-3 -->
+    </div><!-- /.row -->
+</div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {

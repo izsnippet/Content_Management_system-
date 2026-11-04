@@ -42,42 +42,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$page_title = 'Sign In';
 require_once 'includes/header.php';
 ?>
 
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow-sm border-0 mt-4">
-            <div class="card-body p-4">
-                <div class="text-center mb-3">
-                    <i class="bi bi-person-circle display-4 text-primary"></i>
-                    <h3 class="card-title fw-bold mt-2">Sign In</h3>
-                    <p class="text-muted small">Access your author account and articles</p>
-                </div>
+<div class="wk-container" style="max-width:480px;padding-top:2.5rem;padding-bottom:3.5rem;">
+    <div class="wk-auth-card animate-slide-up mx-auto">
 
-                <?php if (!empty($error)): ?>
-                    <div class="alert alert-danger py-2 small"><?= htmlspecialchars($error) ?></div>
-                <?php endif; ?>
+        <!-- Logo / Icon -->
+        <div class="text-center mb-4">
+            <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--accent) 0%,#6366f1 100%);border-radius:12px;display:grid;place-items:center;color:#fff;font-size:1.35rem;margin:0 auto .85rem;">
+                <i class="bi bi-journal-richtext"></i>
+            </div>
+            <h3 class="fw-bold mb-1" style="font-family:var(--font-heading);letter-spacing:-.03em;">Welcome Back</h3>
+            <p class="text-muted small">Sign in to your author account to continue writing</p>
+        </div>
 
-                <form action="login.php" method="POST" autocomplete="off">
-                    <div class="mb-3">
-                        <label for="identifier" class="form-label">Username or Email</label>
-                        <input type="text" name="identifier" id="identifier" class="form-control" value="<?= htmlspecialchars($identifier ?? '') ?>" required autofocus>
-                    </div>
+        <!-- Error Alert -->
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-circle me-2"></i><?= htmlspecialchars($error) ?>
+            </div>
+        <?php endif; ?>
 
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
-                        <input type="password" name="password" id="password" class="form-control" required>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold mt-2">Log In</button>
-                </form>
-
-                <div class="text-center mt-4">
-                    <small class="text-muted">Don't have an account? <a href="register.php" class="text-decoration-none">Sign up</a></small>
+        <!-- Form -->
+        <form action="login.php" method="POST" autocomplete="off">
+            <div class="mb-3">
+                <label for="identifier" class="form-label">Username or Email</label>
+                <div style="position:relative;">
+                    <i class="bi bi-person" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.95rem;pointer-events:none;"></i>
+                    <input type="text" name="identifier" id="identifier" class="form-control"
+                           style="padding-left:2.5rem;"
+                           value="<?= htmlspecialchars($identifier ?? '') ?>"
+                           placeholder="your_username or email@example.com"
+                           required autofocus>
                 </div>
             </div>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="password" class="form-label mb-0">Password</label>
+                    <a href="forgot_password.php" style="font-size:.8rem;color:var(--accent);text-decoration:none;font-weight:600;">Forgot password?</a>
+                </div>
+                <div style="position:relative;">
+                    <i class="bi bi-lock" style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted-light);font-size:.95rem;pointer-events:none;"></i>
+                    <input type="password" name="password" id="password" class="form-control"
+                           style="padding-left:2.5rem;"
+                           placeholder="Enter your password"
+                           required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2" style="font-size:.95rem;">
+                <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
+            </button>
+        </form>
+
+        <div class="wk-auth-footer mt-4 pt-3 border-top">
+            Don't have an account? <a href="register.php">Create one free &rarr;</a>
         </div>
+
     </div>
 </div>
 
