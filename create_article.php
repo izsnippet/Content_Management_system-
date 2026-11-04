@@ -71,15 +71,19 @@ require_once 'includes/header.php';
             </div>
 
             <div class="row mb-3">
-                <div class="col-md-6">
-                    <label for="category_id" class="form-label fw-semibold">Category</label>
-                    <select name="category_id" id="category_id" class="form-select" required>
-                        <option value="">-- Select Category --</option>
-                        <?php while ($cat = $categories->fetch_assoc()): ?>
-                            <option value="<?= $cat['id'] ?>"><?= htmlspecialchars($cat['name']) ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
+               <div class="col-md-6">
+    <label for="category_id" class="form-label fw-semibold">Category</label>
+    <select name="category_id" id="category_id" class="form-select" required>
+        <option value="">-- Select Category --</option>
+        <?php if ($categories && $categories->num_rows > 0): ?>
+            <?php while ($cat = $categories->fetch_assoc()): ?>
+                <option value="<?= $cat['id'] ?>" <?= (isset($_POST['category_id']) && $_POST['category_id'] == $cat['id']) ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($cat['name']) ?>
+                </option>
+            <?php endwhile; ?>
+        <?php endif; ?>
+    </select>
+</div>
                 <div class="col-md-6">
                     <label for="tags" class="form-label fw-semibold">Tags (comma separated)</label>
                     <input type="text" name="tags" id="tags" class="form-control" placeholder="php, mysql, database">

@@ -7,14 +7,16 @@ $article_id = intval($_GET['id'] ?? 0);
 $user_id    = $_SESSION['user_id'];
 $error      = "";
 
-$stmt = $conn->prepare("SELECT * FROM articles WHERE id = ?");
-$stmt->bind_param("i", $article_id);
+// Strict Ownership Verification: Only the original creator can edit
+$stmt = $conn->prepare("SELECT * FROM articles WHERE id = ? AND user_id = ?");
+$stmt->bind_param("ii", $article_id, $user_id);
 $stmt->execute();
 $article = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$article) {
-    die("Article not found.");
+    // If article doesn't exist OR belongs to another author, block access
+    die("Access Denied: You can only edit articles that you created.");
 }
 
 $categories = $conn->query("SELECT id, name FROM categories ORDER BY name ASC");
@@ -30,13 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($new_title) || empty($new_content) || empty($edit_summary)) {
         $error = "Title, Content, and Edit Summary are required.";
     } else {
-        // 1. Preserve current version into article_revisions
+        // 1. Record revision history snapshot
         $rev_stmt = $conn->prepare("INSERT INTO article_revisions (article_id, edited_by_user_id, old_title, old_content, edit_summary) VALUES (?, ?, ?, ?, ?)");
         $rev_stmt->bind_param("iisss", $article_id, $user_id, $article['title'], $article['content'], $edit_summary);
         $rev_stmt->execute();
         $rev_stmt->close();
 
-        // 2. Handle featured image update if provided
+        // 2. Handle image replacement if uploaded
         $image_name = $article['featured_image'];
         if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
             $allowed_exts = ['jpg', 'jpeg', 'png', 'webp'];
@@ -50,9 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // 3. Update the article record
-        $up_stmt = $conn->prepare("UPDATE articles SET category_id = ?, title = ?, content = ?, tags = ?, featured_image = ?, status = ? WHERE id = ?");
-        $up_stmt->bind_param("isssssi", $category_id, $new_title, $new_content, $tags, $image_name, $status, $article_id);
+        // 3. Update the article ensuring ownership holds
+        $up_stmt = $conn->prepare("UPDATE articles SET category_id = ?, title = ?, content = ?, tags = ?, featured_image = ?, status = ? WHERE id = ? AND user_id = ?");
+        $up_stmt->bind_param("isssssii", $category_id, $new_title, $new_content, $tags, $image_name, $status, $article_id, $user_id);
         
         if ($up_stmt->execute()) {
             header("Location: article.php?id=" . $article_id);

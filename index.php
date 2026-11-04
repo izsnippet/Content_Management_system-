@@ -11,7 +11,14 @@ $query = "
     ORDER BY a.created_at DESC
 ";
 $articles = $conn->query($query);
-$categories = $conn->query("SELECT * FROM categories ORDER BY name ASC");
+// Fetch categories along with the count of published articles in each
+$categories = $conn->query("
+    SELECT c.id, c.name, COUNT(a.id) AS article_count 
+    FROM categories c 
+    LEFT JOIN articles a ON c.id = a.category_id AND a.status = 'published'
+    GROUP BY c.id, c.name 
+    ORDER BY c.name ASC
+");
 
 require_once 'includes/header.php';
 ?>
@@ -58,16 +65,19 @@ require_once 'includes/header.php';
     </div>
 
     <div class="col-lg-4">
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white fw-bold">Categories</div>
-            <div class="list-group list-group-flush">
-                <?php while ($cat = $categories->fetch_assoc()): ?>
-                    <a href="category.php?id=<?= $cat['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                        <?= htmlspecialchars($cat['name']) ?>
-                        <i class="bi bi-chevron-right small text-muted"></i>
-                    </a>
-                <?php endwhile; ?>
-            </div>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-grid-3x3-gap"></i> Categories</span>
+            <span class="badge bg-light text-dark border"><?= $categories->num_rows ?></span>
+        </div>
+        <!-- Scrollable box so many categories won't make the page too long -->
+        <div class="list-group list-group-flush" style="max-height: 480px; overflow-y: auto;">
+            <?php while ($cat = $categories->fetch_assoc()): ?>
+                <a href="category.php?id=<?= $cat['id'] ?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <span><?= htmlspecialchars($cat['name']) ?></span>
+                    <span class="badge bg-secondary rounded-pill"><?= $cat['article_count'] ?></span>
+                </a>
+            <?php endwhile; ?>
         </div>
     </div>
 </div>

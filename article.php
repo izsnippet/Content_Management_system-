@@ -58,15 +58,19 @@ require_once 'includes/header.php';
 ?>
 
 <!-- Wikipedia Top Navigation Tabs -->
+<!-- Top Navigation Tabs (Social Media Style: Only Author can Edit) -->
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
         <a class="nav-link active fw-bold" href="article.php?id=<?= $article_id ?>"><i class="bi bi-book"></i> Read</a>
     </li>
-    <?php if (isset($_SESSION['user_id'])): ?>
+    
+    <!-- Render Edit tab ONLY if the viewer is the author who wrote it -->
+    <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
         <li class="nav-item">
-            <a class="nav-link" href="edit_article.php?id=<?= $article_id ?>"><i class="bi bi-pencil"></i> Edit Source</a>
+            <a class="nav-link text-primary fw-semibold" href="edit_article.php?id=<?= $article_id ?>"><i class="bi bi-pencil-square"></i> Edit My Article</a>
         </li>
     <?php endif; ?>
+
     <li class="nav-item">
         <a class="nav-link" href="history.php?id=<?= $article_id ?>"><i class="bi bi-clock-history"></i> View History</a>
     </li>
