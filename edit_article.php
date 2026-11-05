@@ -1,77 +1,106 @@
 <?php
 // edit_article.php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once 'includes/auth_check.php';
-require_once 'config/db.php';
 
 $article_id = intval($_GET['id'] ?? 0);
-$user_id    = $_SESSION['user_id'];
-$error      = "";
+$user_id = intval($_SESSION['user_id'] ?? 0);
+$user_role = $_SESSION['role'] ?? 'author';
 
-// Strict Ownership Verification: Only the original creator can edit
-$stmt = $conn->prepare("SELECT * FROM articles WHERE id = ? AND user_id = ?");
+if ($user_role === 'admin') {
+    header("Location: admin/articles.php?error=admin_cannot_edit");
+    exit();
+}
+
+if ($article_id <= 0 || $user_id <= 0) {
+    header("Location: dashboard.php");
+    exit();
+}
+
+require_once 'config/db.php';
+
+$stmt = $conn->prepare("SELECT * FROM articles WHERE id = ? AND user_id = ? LIMIT 1");
 $stmt->bind_param("ii", $article_id, $user_id);
 $stmt->execute();
 $article = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$article) {
-    // If article doesn't exist OR belongs to another author, block access
-    die("Access Denied: You can only edit articles that you created.");
+    header("Location: dashboard.php?error=unauthorized_edit");
+    exit();
 }
 
 $categories = $conn->query("SELECT id, name FROM categories ORDER BY name ASC");
+$error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $new_title     = trim($_POST['title'] ?? '');
-    $category_id   = intval($_POST['category_id'] ?? 0);
-    $new_content   = trim($_POST['content'] ?? '');
-    $tags          = trim($_POST['tags'] ?? '');
-    $status        = in_array($_POST['status'], ['draft', 'published', 'archived']) ? $_POST['status'] : 'draft';
-    $edit_summary  = trim($_POST['edit_summary'] ?? '');
+    $new_title = trim($_POST['title'] ?? '');
+    $category_id = intval($_POST['category_id'] ?? 0);
+    $new_content = trim($_POST['content'] ?? '');
+    $tags = trim($_POST['tags'] ?? '');
+    $status = in_array($_POST['status'] ?? '', ['draft', 'published'], true) ? $_POST['status'] : 'draft';
+    $edit_summary = trim($_POST['edit_summary'] ?? 'Updated article content');
 
-    if (empty($new_title) || empty($new_content) || empty($edit_summary)) {
-        $error = "Title, Content, and Edit Summary are required.";
+    if ($new_title === '' || $new_content === '' || $category_id <= 0) {
+        $error = "Title, Category, and Content are required fields.";
     } else {
-        // 1. Record revision history snapshot
-        $rev_stmt = $conn->prepare("INSERT INTO article_revisions (article_id, edited_by_user_id, old_title, old_content, edit_summary) VALUES (?, ?, ?, ?, ?)");
-        $rev_stmt->bind_param("iisss", $article_id, $user_id, $article['title'], $article['content'], $edit_summary);
-        $rev_stmt->execute();
-        $rev_stmt->close();
-
-      // Retain existing image by default
         $image_data = $article['featured_image'];
 
-        // If a new image was chosen, convert to Base64 Data URI
         if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
-            $allowed_exts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-            $file_tmp     = $_FILES['featured_image']['tmp_name'];
-            $file_size    = $_FILES['featured_image']['size'];
-            $ext          = strtolower(pathinfo($_FILES['featured_image']['name'], PATHINFO_EXTENSION));
+            $allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+            $file_tmp = $_FILES['featured_image']['tmp_name'];
+            $file_size = $_FILES['featured_image']['size'];
+            $mime_type = mime_content_type($file_tmp);
 
-            if (!in_array($ext, $allowed_exts)) {
-                $error = "Only JPG, PNG, WebP, and GIF images are permitted.";
+            if (!in_array($mime_type, $allowed_types, true)) {
+                $error = "Only JPG, PNG, WebP, and GIF images are allowed.";
             } elseif ($file_size > 2 * 1024 * 1024) {
-                $error = "Image size cannot exceed 2 MB.";
+                $error = "Image size cannot exceed 2MB.";
             } else {
                 $raw_binary = file_get_contents($file_tmp);
-                $base64     = base64_encode($raw_binary);
-                $image_data = 'data:image/' . ($ext === 'jpg' ? 'jpeg' : $ext) . ';base64,' . $base64;
+                if ($raw_binary === false) {
+                    $error = "Unable to read the uploaded image.";
+                } else {
+                    $image_data = 'data:' . $mime_type . ';base64,' . base64_encode($raw_binary);
+                }
             }
+        } elseif (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $error = "The featured image could not be uploaded.";
         }
 
-        if (empty($error)) {
+        if ($error === '') {
+            $rev_stmt = $conn->prepare("INSERT INTO article_revisions (article_id, edited_by_user_id, old_title, old_content, edit_summary) VALUES (?, ?, ?, ?, ?)");
+            $rev_stmt->bind_param("iisss", $article_id, $user_id, $article['title'], $article['content'], $edit_summary);
+            if (!$rev_stmt->execute()) {
+                $error = "Failed to save article revision: " . $conn->error;
+            }
+            $rev_stmt->close();
+        }
+
+        if ($error === '') {
             $up_stmt = $conn->prepare("UPDATE articles SET category_id = ?, title = ?, content = ?, tags = ?, featured_image = ?, status = ? WHERE id = ? AND user_id = ?");
             $up_stmt->bind_param("isssssii", $category_id, $new_title, $new_content, $tags, $image_data, $status, $article_id, $user_id);
-            
+
             if ($up_stmt->execute()) {
+                $up_stmt->close();
                 header("Location: article.php?id=" . $article_id);
                 exit();
             } else {
-                $error = "Failed to update article.";
+                $error = "Database update error: " . $conn->error;
+                $up_stmt->close();
             }
-            $up_stmt->close();
         }
+    }
+}
 
+$form_title = $_POST['title'] ?? $article['title'];
+$form_content = $_POST['content'] ?? $article['content'];
+$form_category_id = intval($_POST['category_id'] ?? $article['category_id']);
+$form_tags = $_POST['tags'] ?? ($article['tags'] ?? '');
+$form_status = $_POST['status'] ?? $article['status'];
+$form_summary = $_POST['edit_summary'] ?? '';
 $page_title = 'Edit: ' . $article['title'];
 require_once 'includes/header.php';
 ?>
@@ -86,7 +115,7 @@ require_once 'includes/header.php';
             <i class="bi bi-book"></i> Read
         </a>
         <a href="edit_article.php?id=<?= $article_id ?>" class="active">
-            <i class="bi bi-pencil-square"></i> Edit Article
+            <i class="bi bi-pencil-square"></i> Edit My Article
         </a>
         <a href="history.php?id=<?= $article_id ?>">
             <i class="bi bi-clock-history"></i> View History
@@ -128,7 +157,7 @@ require_once 'includes/header.php';
                 <div class="mb-3">
                     <label for="title" class="form-label">Article Title <span class="text-danger">*</span></label>
                     <input type="text" name="title" id="title" class="form-control"
-                           value="<?= htmlspecialchars($article['title']) ?>" required>
+                           value="<?= htmlspecialchars($form_title) ?>" required>
                 </div>
 
                 <div class="row g-3 mb-3">
@@ -136,7 +165,7 @@ require_once 'includes/header.php';
                         <label for="category_id" class="form-label">Category <span class="text-danger">*</span></label>
                         <select name="category_id" id="category_id" class="form-select" required>
                             <?php while ($cat = $categories->fetch_assoc()): ?>
-                                <option value="<?= $cat['id'] ?>" <?= $cat['id'] == $article['category_id'] ? 'selected' : '' ?>>
+                                <option value="<?= $cat['id'] ?>" <?= $cat['id'] == $form_category_id ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($cat['name']) ?>
                                 </option>
                             <?php endwhile; ?>
@@ -145,7 +174,7 @@ require_once 'includes/header.php';
                     <div class="col-md-6">
                         <label for="tags" class="form-label">Tags (comma separated)</label>
                         <input type="text" name="tags" id="tags" class="form-control"
-                               value="<?= htmlspecialchars($article['tags'] ?? '') ?>"
+                               value="<?= htmlspecialchars($form_tags) ?>"
                                placeholder="php, web development, tutorial">
                     </div>
                 </div>
@@ -154,19 +183,19 @@ require_once 'includes/header.php';
                     <label for="featured_image" class="form-label">Change Featured Image</label>
                     <?php if (!empty($article['featured_image'])): ?>
                         <div class="d-flex align-items-center gap-2 mb-2 p-2 bg-light border rounded" style="max-width:320px;">
-                            <img src="uploads/images/<?= htmlspecialchars($article['featured_image']) ?>"
+                            <img src="<?= htmlspecialchars($article['featured_image'], ENT_QUOTES, 'UTF-8') ?>"
                                  alt="Current Featured" style="width:48px;height:48px;object-fit:cover;border-radius:4px;">
                             <div class="small text-muted text-truncate">Current: <?= htmlspecialchars($article['featured_image']) ?></div>
                         </div>
                     <?php endif; ?>
                     <input type="file" name="featured_image" id="featured_image" class="form-control" accept="image/*">
-                    <div class="form-text">Upload a new image to replace the current one (Max 3 MB).</div>
+                    <div class="form-text">Upload a new image to replace the current one (Max 2 MB).</div>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label">Content <span class="text-danger">*</span></label>
                     <input type="hidden" name="content" id="hiddenContent">
-                    <div id="editor" style="height: 360px;" class="bg-white"><?= $article['content'] ?></div>
+                    <div id="editor" style="height: 360px;" class="bg-white"></div>
                 </div>
 
                 <!-- Wikipedia-Style Edit Summary Box -->
@@ -175,7 +204,8 @@ require_once 'includes/header.php';
                         <i class="bi bi-clock-history"></i>
                         <span>Edit Summary (Required for Revision History)</span>
                     </div>
-                    <input type="text" name="edit_summary" id="edit_summary" class="form-control bg-white" 
+                    <input type="text" name="edit_summary" id="edit_summary" class="form-control bg-white"
+                           value="<?= htmlspecialchars($form_summary) ?>"
                            placeholder="Briefly describe what you changed (e.g. Added section on architecture, fixed typos, updated references)" required>
                     <div class="form-text mt-1" style="color:var(--text-secondary);font-size:.78rem;">
                         <i class="bi bi-shield-check text-success me-1"></i>
@@ -190,9 +220,8 @@ require_once 'includes/header.php';
                     <div class="d-flex align-items-center gap-2">
                         <label for="statusSelect" class="form-label mb-0 small text-muted">Status:</label>
                         <select name="status" id="statusSelect" class="form-select w-auto d-inline-block">
-                            <option value="published" <?= $article['status'] === 'published' ? 'selected' : '' ?>>Published</option>
-                            <option value="draft" <?= $article['status'] === 'draft' ? 'selected' : '' ?>>Draft</option>
-                            <option value="archived" <?= $article['status'] === 'archived' ? 'selected' : '' ?>>Archived</option>
+                            <option value="published" <?= $form_status === 'published' ? 'selected' : '' ?>>Published</option>
+                            <option value="draft" <?= $form_status === 'draft' ? 'selected' : '' ?>>Draft</option>
                         </select>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check2-circle me-1"></i> Save Changes
@@ -219,9 +248,16 @@ require_once 'includes/header.php';
         }
     });
 
-    document.getElementById('editForm').onsubmit = function() {
+    const initialContent = <?= json_encode($form_content, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+    quill.clipboard.dangerouslyPasteHTML(initialContent);
+
+    document.getElementById('editForm').addEventListener('submit', function(event) {
         document.getElementById('hiddenContent').value = quill.root.innerHTML;
-    };
+        if (quill.getText().trim().length === 0) {
+            event.preventDefault();
+            alert('Article content cannot be empty.');
+        }
+    });
 </script>
 
 <?php require_once 'includes/footer.php'; ?>

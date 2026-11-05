@@ -4,25 +4,25 @@ require_once 'includes/admin_header.php';
 
 $message = "";
 
-// Global Delete Action
+// Admin Delete Action
 if (isset($_GET['delete'])) {
     $del_id = intval($_GET['delete']);
     $stmt = $conn->prepare("DELETE FROM articles WHERE id = ?");
     $stmt->bind_param("i", $del_id);
     if ($stmt->execute()) {
-        $message = "Article removed by Administrator.";
+        $message = "Article removed by administrative action.";
     }
     $stmt->close();
 }
 
-// Global Status Switch
+// Admin Status Override
 if (isset($_GET['status']) && isset($_GET['id'])) {
     $art_id     = intval($_GET['id']);
     $new_status = in_array($_GET['status'], ['published', 'draft', 'archived']) ? $_GET['status'] : 'draft';
     $stmt = $conn->prepare("UPDATE articles SET status = ? WHERE id = ?");
     $stmt->bind_param("si", $new_status, $art_id);
     if ($stmt->execute()) {
-        $message = "Article status changed to " . htmlspecialchars($new_status) . ".";
+        $message = "Status updated to " . htmlspecialchars($new_status) . ".";
     }
     $stmt->close();
 }
@@ -37,10 +37,10 @@ $articles = $conn->query("
 ?>
 
 <div class="d-flex justify-content-between align-items-center pb-2 mb-4 border-bottom">
-    <h2 class="h3 fw-bold mb-0">Article Moderation</h2>
-    <a href="../create_article.php" target="_blank" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i> New Article
-    </a>
+    <div>
+        <h2 class="h3 fw-bold mb-1">Global Content Moderation</h2>
+        <p class="text-muted small mb-0">Oversee user articles, change visibility status, or delete offensive posts.</p>
+    </div>
 </div>
 
 <?php if (!empty($message)): ?>
@@ -53,22 +53,20 @@ $articles = $conn->query("
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-3">Article</th>
+                        <th class="ps-3">Article Title</th>
                         <th>Author</th>
                         <th>Category</th>
                         <th>Status</th>
                         <th>Last Modified</th>
-                        <th class="text-end pe-3">Admin Actions</th>
+                        <th class="text-end pe-3">Moderation Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if ($articles && $articles->num_rows > 0): ?>
                         <?php while ($row = $articles->fetch_assoc()): ?>
                             <tr>
-                                <td class="ps-3 fw-semibold">
-                                    <a href="../article.php?id=<?= $row['id'] ?>" target="_blank" class="text-decoration-none text-dark">
-                                        <?= htmlspecialchars($row['title']) ?>
-                                    </a>
+                                <td class="ps-3 fw-semibold text-dark">
+                                    <?= htmlspecialchars($row['title']) ?>
                                 </td>
                                 <td><?= htmlspecialchars($row['username']) ?></td>
                                 <td><span class="badge bg-light text-dark border"><?= htmlspecialchars($row['category_name']) ?></span></td>
@@ -86,17 +84,17 @@ $articles = $conn->query("
                                 </td>
                                 <td class="text-muted small"><?= date('M d, Y', strtotime($row['updated_at'])) ?></td>
                                 <td class="text-end pe-3">
-                                    <a href="../history.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary me-1" title="View Revisions">
-                                        <i class="bi bi-clock-history"></i>
+                                    <a href="../history.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary me-1" title="View Version Snapshots">
+                                        <i class="bi bi-clock-history"></i> History
                                     </a>
-                                    <a href="articles.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Admin: Permanently delete this article?');">
+                                    <a href="articles.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Administrative Action: Permanently delete this article?');">
                                         <i class="bi bi-trash"></i> Delete
                                     </a>
                                 </td>
                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                        <tr><td colspan="6" class="text-center py-4 text-muted">No articles created yet.</td></tr>
+                        <tr><td colspan="6" class="text-center py-4 text-muted">No content found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>

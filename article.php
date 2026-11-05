@@ -108,30 +108,30 @@ require_once 'includes/header.php';
 <div class="wk-container" style="max-width:1300px;padding-top:1.75rem;padding-bottom:3rem;">
 
     <!-- ── Article Tabs & Watchlist Action ── -->
-    <div class="wk-article-tabs d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="d-flex gap-1 flex-wrap">
-            <a href="article.php?id=<?= $article_id ?>" class="active">
-                <i class="bi bi-book"></i> Read
-            </a>
-            <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
-                <a href="edit_article.php?id=<?= $article_id ?>">
-                    <i class="bi bi-pencil-square"></i> Edit Article
-                </a>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <ul class="nav nav-tabs mb-0 border-bottom-0">
+            <li class="nav-item">
+                <a class="nav-link active fw-bold" href="article.php?id=<?= $article_id ?>"><i class="bi bi-book"></i> Read</a>
+            </li>
+            <?php
+                $logged_in_id = intval($_SESSION['user_id'] ?? 0);
+                $author_id = intval($article['user_id']);
+                $user_role = $_SESSION['role'] ?? 'author';
+            ?>
+            <?php if ($logged_in_id > 0 && $logged_in_id === $author_id && $user_role !== 'admin'): ?>
+                <li class="nav-item">
+                    <a class="nav-link text-primary fw-semibold" href="edit_article.php?id=<?= $article_id ?>"><i class="bi bi-pencil-square"></i> Edit My Article</a>
+                </li>
             <?php endif; ?>
-            <a href="history.php?id=<?= $article_id ?>">
-                <i class="bi bi-clock-history"></i> View History
-            </a>
-        </div>
+            <li class="nav-item">
+                <a class="nav-link" href="history.php?id=<?= $article_id ?>"><i class="bi bi-clock-history"></i> View History</a>
+            </li>
+        </ul>
 
-        <?php if (isset($_SESSION['user_id'])): ?>
-            <div class="mb-2 mb-md-0">
-                <a href="article.php?id=<?= $article_id ?>&toggle_watchlist=1"
-                   class="btn btn-sm <?= $is_bookmarked ? 'btn-outline-warning text-dark border-warning' : 'btn-outline-secondary' ?>"
-                   title="<?= $is_bookmarked ? 'Remove this article from your watchlist' : 'Bookmark this article to your watchlist' ?>">
-                    <i class="bi <?= $is_bookmarked ? 'bi-star-fill text-warning' : 'bi-star' ?> me-1"></i>
-                    <?= $is_bookmarked ? 'Remove from Watchlist' : 'Add to Watchlist' ?>
-                </a>
-            </div>
+        <?php if (!empty($_SESSION['user_id'])): ?>
+            <a href="article.php?id=<?= $article_id ?>&toggle_watchlist=1" class="btn btn-sm <?= $is_bookmarked ? 'btn-warning text-dark' : 'btn-outline-secondary' ?>">
+                <i class="bi <?= $is_bookmarked ? 'bi-star-fill' : 'bi-star' ?>"></i> <?= $is_bookmarked ? 'Saved in Watchlist' : 'Add to Watchlist' ?>
+            </a>
         <?php endif; ?>
     </div>
 
@@ -164,9 +164,9 @@ require_once 'includes/header.php';
 
             <!-- Featured Image -->
             <?php if (!empty($article['featured_image'])): ?>
-                <img src="uploads/images/<?= htmlspecialchars($article['featured_image']) ?>"
-                     class="wk-featured-img animate-fade-in"
-                     alt="Featured image for <?= htmlspecialchars($article['title']) ?>">
+                <div class="mb-4 text-center">
+                    <img src="<?= htmlspecialchars($article['featured_image'], ENT_QUOTES, 'UTF-8') ?>" class="img-fluid rounded shadow-sm" style="max-height: 450px; width: 100%; object-fit: cover;" alt="<?= htmlspecialchars($article['title']) ?>">
+                </div>
             <?php endif; ?>
 
             <!-- Table of Contents -->
@@ -310,9 +310,9 @@ require_once 'includes/header.php';
                     <a href="history.php?id=<?= $article_id ?>" class="btn btn-outline-secondary btn-sm w-100">
                         <i class="bi bi-clock-history me-1"></i> View History
                     </a>
-                    <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $article['user_id']): ?>
+                    <?php if ($logged_in_id > 0 && $logged_in_id === $author_id && $user_role !== 'admin'): ?>
                         <a href="edit_article.php?id=<?= $article_id ?>" class="btn btn-outline-primary btn-sm w-100">
-                            <i class="bi bi-pencil me-1"></i> Edit Article
+                            <i class="bi bi-pencil me-1"></i> Edit My Article
                         </a>
                     <?php endif; ?>
                 </div>

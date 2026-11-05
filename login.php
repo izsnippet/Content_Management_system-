@@ -3,7 +3,7 @@
 require_once 'config/db.php';
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: dashboard.php");
+    header("Location: " . (($_SESSION['role'] ?? '') === 'admin' ? "admin/index.php" : "dashboard.php"));
     exit();
 }
 
@@ -16,22 +16,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($identifier) || empty($password)) {
         $error = "Please enter both username/email and password.";
     } else {
-        $stmt = $conn->prepare("SELECT id, username, email, password_hash, role FROM users WHERE username = ? OR email = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, username, email, password_hash, role, status FROM users WHERE username = ? OR email = ? LIMIT 1");
         $stmt->bind_param("ss", $identifier, $identifier);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if ($user = $result->fetch_assoc()) {
             if (password_verify($password, $user['password_hash'])) {
-                session_regenerate_id(true);
+                if (($user['status'] ?? 'active') === 'banned') {
+                    $_SESSION = [];
+                    session_destroy();
+                    $error = "Your account has been suspended by the administrator.";
+                } else {
+                    session_regenerate_id(true);
 
-                $_SESSION['user_id']  = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['email']    = $user['email'];
-                $_SESSION['role']     = $user['role'];
+                    $_SESSION['user_id']  = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['email']    = $user['email'];
+                    $_SESSION['role']     = $user['role'];
 
-                header("Location: dashboard.php");
-                exit();
+                    header("Location: " . ($user['role'] === 'admin' ? "admin/index.php" : "dashboard.php"));
+                    exit();
+                }
             } else {
                 $error = "Invalid credentials. Please check your password.";
             }
@@ -60,7 +66,7 @@ require_once 'includes/header.php';
 
         <!-- Error Alert -->
         <?php if (!empty($error)): ?>
-            <div class="alert alert-danger" role="alert">
+            <div class="alert alert-danger border-danger border-2 fw-semibold" role="alert">
                 <i class="bi bi-exclamation-circle me-2"></i><?= htmlspecialchars($error) ?>
             </div>
         <?php endif; ?>

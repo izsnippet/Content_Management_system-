@@ -13,25 +13,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tags        = trim($_POST['tags'] ?? '');
     $status      = in_array($_POST['status'], ['draft', 'published']) ? $_POST['status'] : 'draft';
     $user_id     = $_SESSION['user_id'];
-    $image_name  = null;
+    $image_data  = null;
 
     if (empty($title) || empty($content) || $category_id <= 0) {
         $error = "Title, Category, and Content are required.";
     } else {
         if (isset($_FILES['featured_image']) && $_FILES['featured_image']['error'] === UPLOAD_ERR_OK) {
-            $allowed_exts = ['jpg', 'jpeg', 'png', 'webp'];
+            $allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
             $file_tmp     = $_FILES['featured_image']['tmp_name'];
-            $file_name    = $_FILES['featured_image']['name'];
             $file_size    = $_FILES['featured_image']['size'];
-            $ext          = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+            $mime_type    = mime_content_type($file_tmp);
 
-            if (!in_array($ext, $allowed_exts)) {
-                $error = "Only JPG, PNG, and WebP images are permitted.";
-            } elseif ($file_size > 3 * 1024 * 1024) {
-                $error = "Image size cannot exceed 3 MB.";
+            if (!in_array($mime_type, $allowed_types, true)) {
+                $error = "Only JPG, PNG, WebP, and GIF images are allowed.";
+            } elseif ($file_size > 2 * 1024 * 1024) {
+                $error = "Image size cannot exceed 2MB.";
             } else {
-                $image_name = uniqid('img_', true) . '.' . $ext;
-                move_uploaded_file($file_tmp, 'uploads/images/' . $image_name);
+                $raw_binary = file_get_contents($file_tmp);
+                if ($raw_binary === false) {
+                    $error = "Unable to read the uploaded image.";
+                } else {
+                    $image_data = 'data:' . $mime_type . ';base64,' . base64_encode($raw_binary);
+                }
             }
         }
 
@@ -124,7 +127,7 @@ require_once 'includes/header.php';
                 <div class="mb-3">
                     <label for="featured_image" class="form-label">Featured Image (Optional)</label>
                     <input type="file" name="featured_image" id="featured_image" class="form-control" accept="image/*">
-                    <div class="form-text">Supported formats: JPG, PNG, WebP (Max 3 MB).</div>
+                    <div class="form-text">Supported formats: JPG, PNG, WebP, and GIF (Max 2 MB).</div>
                 </div>
 
                 <div class="mb-4">

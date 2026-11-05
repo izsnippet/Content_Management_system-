@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $host = "localhost";
 $username = "root";
 $password = "";
-$database = "wiki_cms_db";
+$database = "wiki_cms_v2";
 
 // Enable MySQLi error reporting.
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
