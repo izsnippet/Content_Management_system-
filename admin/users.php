@@ -116,7 +116,7 @@ $users = $conn->query("
                         <?php $status = $u['status'] ?? 'active'; ?>
                         <tr>
                             <td class="ps-3">
-                                <span class="fw-bold text-dark"><?= htmlspecialchars($u['username']) ?></span>
+                                <a href="user_detail.php?id=<?= (int) $u['id'] ?>" class="fw-bold text-primary text-decoration-none"><?= htmlspecialchars($u['username']) ?></a> <span class="badge bg-light text-muted border ms-1">#<?= (int) $u['id'] ?></span>
                                 <div class="text-muted small"><?= htmlspecialchars($u['email']) ?></div>
                             </td>
                             <td>

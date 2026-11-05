@@ -81,7 +81,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?= $current_page === 'users.php' ? 'active' : '' ?>" href="users.php">
+                        <a class="nav-link <?= in_array($current_page, ['users.php', 'user_detail.php'], true) ? 'active' : '' ?>" href="users.php">
                             <i class="bi bi-person-gear me-2"></i> User Directory & Bans
                         </a>
                     </li>
@@ -90,14 +90,25 @@ $current_page = basename($_SERVER['PHP_SELF']);
                             <i class="bi bi-shield-check me-2"></i> Content Moderation
                         </a>
                     </li>
+                    <li class="nav-item"><a class="nav-link <?= $current_page === 'revisions.php' ? 'active' : '' ?>" href="revisions.php"><i class="bi bi-clock-history me-2"></i> Revision Rollback</a></li>
                     <li class="nav-item">
                         <a class="nav-link <?= $current_page === 'categories.php' ? 'active' : '' ?>" href="categories.php">
                             <i class="bi bi-tags me-2"></i> Taxonomy Manager
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link <?= $current_page === 'pages.php' ? 'active' : '' ?>" href="pages.php">
+                            <i class="bi bi-file-earmark-text me-2"></i> Static Pages
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link <?= $current_page === 'comments.php' ? 'active' : '' ?>" href="comments.php">
                             <i class="bi bi-chat-square-dots me-2"></i> Comment Moderation
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link <?= $current_page === 'settings.php' ? 'active' : '' ?>" href="settings.php">
+                            <i class="bi bi-sliders me-2"></i> Site Settings
                         </a>
                     </li>
                 </ul>

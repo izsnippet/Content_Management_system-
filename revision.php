@@ -5,9 +5,10 @@ require_once 'config/db.php';
 $rev_id = intval($_GET['rev_id'] ?? 0);
 
 $query = "
-    SELECT r.*, u.username 
+    SELECT r.*, u.username, a.user_id AS article_author_id
     FROM article_revisions r
     JOIN users u ON r.edited_by_user_id = u.id
+    JOIN articles a ON r.article_id = a.id
     WHERE r.id = ?
 ";
 $stmt = $conn->prepare($query);
@@ -17,7 +18,15 @@ $rev = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$rev) {
+    http_response_code(404);
     die("Historical snapshot not found.");
+}
+
+$viewer_id = intval($_SESSION['user_id'] ?? 0);
+$viewer_role = $_SESSION['role'] ?? 'author';
+if ($viewer_id <= 0 || $viewer_id !== intval($rev['article_author_id']) || $viewer_role === 'admin') {
+    http_response_code(403);
+    die("Access denied. Only the article's author can view its revision history.");
 }
 
 $page_title = 'Archived Snapshot: ' . $rev['old_title'];

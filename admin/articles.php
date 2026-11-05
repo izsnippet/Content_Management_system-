@@ -3,6 +3,41 @@
 require_once 'includes/admin_header.php';
 
 $message = "";
+$error = "";
+if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+$csrf_token = $_SESSION['csrf_token'];
+
+// Restore the latest saved title/content snapshot. Save the current state first so rollback is reversible.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rollback_article'])) {
+    if (!isset($_POST['csrf_token']) || !hash_equals($csrf_token, $_POST['csrf_token'])) {
+        $error = 'Invalid security token. Reload and try again.';
+    } else {
+        $art_id = intval($_POST['article_id'] ?? 0);
+        $conn->begin_transaction();
+        try {
+            $cur = $conn->prepare('SELECT title, content FROM articles WHERE id = ? FOR UPDATE');
+            $cur->bind_param('i', $art_id); $cur->execute(); $current = $cur->get_result()->fetch_assoc(); $cur->close();
+            $rev = $conn->prepare('SELECT old_title, old_content FROM article_revisions WHERE article_id = ? ORDER BY edited_at DESC, id DESC LIMIT 1');
+            $rev->bind_param('i', $art_id); $rev->execute(); $snapshot = $rev->get_result()->fetch_assoc(); $rev->close();
+            if (!$current || !$snapshot) throw new RuntimeException('No saved revision is available to restore.');
+            $admin_id = (int) $_SESSION['user_id'];
+            $summary = 'Pre-rollback snapshot saved by administrator';
+            $save = $conn->prepare('INSERT INTO article_revisions (article_id, edited_by_user_id, old_title, old_content, edit_summary) VALUES (?, ?, ?, ?, ?)');
+            $save->bind_param('iisss', $art_id, $admin_id, $current['title'], $current['content'], $summary);
+            if (!$save->execute()) throw new RuntimeException('Could not preserve current article revision.');
+            $save->close();
+            $update = $conn->prepare('UPDATE articles SET title = ?, content = ? WHERE id = ?');
+            $update->bind_param('ssi', $snapshot['old_title'], $snapshot['old_content'], $art_id);
+            if (!$update->execute()) throw new RuntimeException('Could not restore the article.');
+            $update->close();
+            $conn->commit();
+            $message = 'Article rolled back to its latest saved revision.';
+        } catch (Throwable $e) {
+            $conn->rollback();
+            $error = $e->getMessage();
+        }
+    }
+}
 
 // Admin Delete Action
 if (isset($_GET['delete'])) {
@@ -46,6 +81,7 @@ $articles = $conn->query("
 <?php if (!empty($message)): ?>
     <div class="alert alert-success py-2 small"><?= htmlspecialchars($message) ?></div>
 <?php endif; ?>
+<?php if (!empty($error)): ?><div class="alert alert-danger py-2 small"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
@@ -84,9 +120,14 @@ $articles = $conn->query("
                                 </td>
                                 <td class="text-muted small"><?= date('M d, Y', strtotime($row['updated_at'])) ?></td>
                                 <td class="text-end pe-3">
-                                    <a href="../history.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary me-1" title="View Version Snapshots">
+                                    <a href="revisions.php?article_id=<?= (int)$row['id'] ?>" class="btn btn-sm btn-outline-secondary me-1" title="View Version Snapshots">
                                         <i class="bi bi-clock-history"></i> History
                                     </a>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Restore the latest saved revision for this article?');">
+                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+                                        <input type="hidden" name="article_id" value="<?= (int) $row['id'] ?>">
+                                        <button type="submit" name="rollback_article" class="btn btn-sm btn-outline-warning me-1"><i class="bi bi-arrow-counterclockwise"></i> Rollback</button>
+                                    </form>
                                     <a href="articles.php?delete=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Administrative Action: Permanently delete this article?');">
                                         <i class="bi bi-trash"></i> Delete
                                     </a>

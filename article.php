@@ -2,6 +2,15 @@
 // article.php
 require_once 'config/db.php';
 
+$settings_row = null;
+try {
+    $settings_res = $conn->query("SELECT setting_value FROM site_settings WHERE setting_key = 'comments_enabled'");
+    $settings_row = $settings_res ? $settings_res->fetch_assoc() : null;
+} catch (mysqli_sql_exception $e) {
+    // Keep the public site available before the settings migration is applied.
+}
+$comments_active = ($settings_row['setting_value'] ?? '1') === '1';
+
 $article_id = intval($_GET['id'] ?? 0);
 
 $query = "
@@ -22,7 +31,7 @@ if (!$article) {
 }
 
 // 1. Comment Submission Handler
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_comment']) && $comments_active) {
     if (!isset($_SESSION['user_id'])) {
         header("Location: login.php");
         exit();
@@ -123,9 +132,9 @@ require_once 'includes/header.php';
                     <a class="nav-link text-primary fw-semibold" href="edit_article.php?id=<?= $article_id ?>"><i class="bi bi-pencil-square"></i> Edit My Article</a>
                 </li>
             <?php endif; ?>
-            <li class="nav-item">
-                <a class="nav-link" href="history.php?id=<?= $article_id ?>"><i class="bi bi-clock-history"></i> View History</a>
-            </li>
+            <?php if ($logged_in_id > 0 && $logged_in_id === $author_id && $user_role !== 'admin'): ?>
+                <li class="nav-item"><a class="nav-link" href="history.php?id=<?= $article_id ?>"><i class="bi bi-clock-history"></i> View History</a></li>
+            <?php endif; ?>
         </ul>
 
         <?php if (!empty($_SESSION['user_id'])): ?>
@@ -164,8 +173,9 @@ require_once 'includes/header.php';
 
             <!-- Featured Image -->
             <?php if (!empty($article['featured_image'])): ?>
+                <?php $featured_image_src = str_starts_with($article['featured_image'], 'data:image/') ? $article['featured_image'] : 'uploads/images/' . rawurlencode($article['featured_image']); ?>
                 <div class="mb-4 text-center">
-                    <img src="<?= htmlspecialchars($article['featured_image'], ENT_QUOTES, 'UTF-8') ?>" class="img-fluid rounded shadow-sm" style="max-height: 450px; width: 100%; object-fit: cover;" alt="<?= htmlspecialchars($article['title']) ?>">
+                    <img src="<?= htmlspecialchars($featured_image_src, ENT_QUOTES, 'UTF-8') ?>" class="wk-featured-img" alt="<?= htmlspecialchars($article['title']) ?>">
                 </div>
             <?php endif; ?>
 
@@ -202,7 +212,9 @@ require_once 'includes/header.php';
                     <span class="wk-comment-count"><?= $comments->num_rows ?></span>
                 </div>
 
-                <?php if (isset($_SESSION['user_id'])): ?>
+                <?php if (!$comments_active): ?>
+                    <div class="wk-comment-login-prompt"><i class="bi bi-lock me-1"></i> Discussion has been disabled by the administrator.</div>
+                <?php elseif (isset($_SESSION['user_id'])): ?>
                     <div class="wk-comment-form">
                         <form action="article.php?id=<?= $article_id ?>" method="POST">
                             <div class="mb-3">
@@ -307,10 +319,8 @@ require_once 'includes/header.php';
                             <?= $is_bookmarked ? 'Remove from Watchlist' : 'Add to Watchlist' ?>
                         </a>
                     <?php endif; ?>
-                    <a href="history.php?id=<?= $article_id ?>" class="btn btn-outline-secondary btn-sm w-100">
-                        <i class="bi bi-clock-history me-1"></i> View History
-                    </a>
                     <?php if ($logged_in_id > 0 && $logged_in_id === $author_id && $user_role !== 'admin'): ?>
+                        <a href="history.php?id=<?= $article_id ?>" class="btn btn-outline-secondary btn-sm w-100"><i class="bi bi-clock-history me-1"></i> View History</a>
                         <a href="edit_article.php?id=<?= $article_id ?>" class="btn btn-outline-primary btn-sm w-100">
                             <i class="bi bi-pencil me-1"></i> Edit My Article
                         </a>

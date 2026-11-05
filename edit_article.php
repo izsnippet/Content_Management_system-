@@ -182,9 +182,10 @@ require_once 'includes/header.php';
                 <div class="mb-3">
                     <label for="featured_image" class="form-label">Change Featured Image</label>
                     <?php if (!empty($article['featured_image'])): ?>
+                        <?php $preview_image_src = str_starts_with($article['featured_image'], 'data:image/') ? $article['featured_image'] : 'uploads/images/' . rawurlencode($article['featured_image']); ?>
                         <div class="d-flex align-items-center gap-2 mb-2 p-2 bg-light border rounded" style="max-width:320px;">
-                            <img src="<?= htmlspecialchars($article['featured_image'], ENT_QUOTES, 'UTF-8') ?>"
-                                 alt="Current Featured" style="width:48px;height:48px;object-fit:cover;border-radius:4px;">
+                            <img src="<?= htmlspecialchars($preview_image_src, ENT_QUOTES, 'UTF-8') ?>"
+                                 alt="Current Featured" style="width:100%;max-width:320px;max-height:220px;object-fit:contain;border-radius:4px;background:#f1f5f9;">
                             <div class="small text-muted text-truncate">Current: <?= htmlspecialchars($article['featured_image']) ?></div>
                         </div>
                     <?php endif; ?>

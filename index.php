@@ -88,6 +88,10 @@ require_once 'includes/header.php';
                 <?php if ($articles->num_rows > 0): ?>
                     <?php while ($row = $articles->fetch_assoc()): ?>
                         <article class="wk-article-card mb-3 reveal">
+                            <?php if (!empty($row['featured_image'])): ?>
+                                <?php $card_image = str_starts_with($row['featured_image'], 'data:image/') ? $row['featured_image'] : 'uploads/images/' . rawurlencode($row['featured_image']); ?>
+                                <div class="wk-article-image-frame"><img src="<?= htmlspecialchars($card_image, ENT_QUOTES, 'UTF-8') ?>" alt="Featured image for <?= htmlspecialchars($row['title']) ?>" loading="lazy"></div>
+                            <?php endif; ?>
                             <div class="card-body">
                                 <div class="wk-article-meta">
                                     <span class="badge badge-category">
