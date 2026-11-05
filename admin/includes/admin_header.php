@@ -86,12 +86,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link <?= $current_page === 'articles.php' ? 'active' : '' ?>" href="articles.php">
-                            <i class="bi bi-shield-check me-2"></i> Content Moderation
-                        </a>
-                    </li>
-                    <li class="nav-item"><a class="nav-link <?= $current_page === 'revisions.php' ? 'active' : '' ?>" href="revisions.php"><i class="bi bi-clock-history me-2"></i> Revision Rollback</a></li>
-                    <li class="nav-item">
                         <a class="nav-link <?= $current_page === 'categories.php' ? 'active' : '' ?>" href="categories.php">
                             <i class="bi bi-tags me-2"></i> Taxonomy Manager
                         </a>
